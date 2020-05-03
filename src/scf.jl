@@ -22,7 +22,7 @@ nuclear_repulsion(mole::Mole, env::Env) = nuclear_repulsion(mole.atoms, env.pcha
 
 function overlap_matrix(basis::Basis)
     n = length(basis)
-    M = Matrix{Float64}(undef, n, n)
+    M = zeros(n, n)
     for (i,j) in pairs(n)
         M[i, j] = M[j, i] = overlap(basis[i], basis[j])
     end
@@ -33,7 +33,7 @@ overlap_matrix(mole::Mole) = overlap_matrix(mole.basis)
 
 function kinetic_matrix(basis::Basis)
     n = length(basis)
-    M = Matrix{Float64}(undef, n, n)
+    M = zeros(n, n)
     for (i,j) in pairs(n)
         M[i, j] = M[j, i] = kinetic(basis[i], basis[j])
     end
@@ -44,7 +44,7 @@ kinetic_matrix(mole::Mole) = kinetic_matrix(mole.basis)
 
 function nuclear_attraction_matrix(basis::Basis, RC::Vector{Vec3{Float64}}, Z::Vector{Float64})
     n = length(basis)
-    M = Matrix{Float64}(undef, n, n)
+    M = zeros(n, n)
     for (i,j) in pairs(n)
         for (rc, z) in zip(RC, Z)
             M[i, j] += nuclear_attraction(basis[i], basis[j], rc, z)
@@ -58,7 +58,7 @@ nuclear_attraction_matrix(mole::Mole) = nuclear_attraction_matrix(mole.basis, mo
 
 function nuclear_attraction_matrix(basis::Basis, RC::Vector{Vec3{Float64}}, Z::Vector{Float64}, RQ::Vector{Vec3{Float64}}, Q::Vector{Float64})
     n = length(basis)
-    M = Matrix{Float64}(undef, n, n)
+    M = zeros(n, n)
     for (i,j) in pairs(n)
         for (rc, z) in zip(RC, Z)
             M[i, j] += nuclear_attraction(basis[i], basis[j], rc, z)
@@ -76,7 +76,7 @@ nuclear_attraction_matrix(mole::Mole, env::Env) = nuclear_attraction_matrix(mole
 function twoe_integral_tensor(basis::Basis)
     n = length(basis)
     N = binomial(binomial(n + 1, 2) + 1, 2)
-    tensor = Vector{Float64}(undef, N)
+    tensor = zeros(N)
     for (i,j,k,l) in basis_iterator(n)
 #         println("$i,$j,$k,$l,$(basis_index(i,j,k,l))")
         tensor[basis_index(i,j,k,l)] = electron_repulsion(basis[i], basis[j], basis[k], basis[l])

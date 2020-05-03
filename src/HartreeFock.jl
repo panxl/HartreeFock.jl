@@ -1,7 +1,7 @@
 module HartreeFock
 
-using LinearAlgebra: norm, eigen
-using SpecialFunctions: gamma, gamma_inc
+using LinearAlgebra
+using SpecialFunctions
 using StaticArrays
 using JSON
 
