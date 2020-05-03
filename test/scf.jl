@@ -1,4 +1,5 @@
 using HartreeFock: Atom, Atoms, PCharge, PCharges, Mole, Env, scf
+using Test
 
 atoms = Atoms()
 push!(atoms, Atom([0.0,0.0,0.0], 1))
@@ -7,7 +8,7 @@ H2 = Mole(atoms, "STO-3G")
 E, P = scf(H2)
 @test E ≈ -1.116714325
 
-H2O = Mole(Atoms("data/water.xyz"), "STO-3G")
+H2O = Mole(Atoms(joinpath(@__DIR__, "data/water.xyz")), "STO-3G")
 E, P = scf(H2O)
 @test E ≈ -74.962927947
 
