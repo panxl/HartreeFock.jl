@@ -1,7 +1,7 @@
 nuclear_repulsion(ZA::Float64, RA::Vec3{Float64}, ZB::Float64, RB::Vec3{Float64}) = ZA * ZB / norm(RA - RB)
 nuclear_repulsion(A::AbstractParticle, B::AbstractParticle) = nuclear_repulsion(A.charge, A.position, B.charge, B.position)
 
-function nuclear_repulsion(particles::AbstractParticles)
+function nuclear_repulsion(particles::AbstractParticleGroup)
     ret = 0.0
     for i = 1:length(particles)-1, j = i+1:length(particles)
         ret += nuclear_repulsion(particles[i], particles[j])
@@ -9,7 +9,7 @@ function nuclear_repulsion(particles::AbstractParticles)
     return ret
 end
 
-function nuclear_repulsion(particle_a::AbstractParticles, particle_b::AbstractParticles)
+function nuclear_repulsion(particle_a::AbstractParticleGroup, particle_b::AbstractParticleGroup)
     ret = 0.0
     for i = 1:length(particle_a), j = 1:length(particle_b)
         ret += nuclear_repulsion(particle_a[i], particle_b[j])
@@ -17,8 +17,8 @@ function nuclear_repulsion(particle_a::AbstractParticles, particle_b::AbstractPa
     return ret
 end
 
-nuclear_repulsion(mole::Mole) = nuclear_repulsion(mole.atoms)
-nuclear_repulsion(mole::Mole, env::Env) = nuclear_repulsion(mole.atoms, env.pcharges)
+nuclear_repulsion(mole::Mole) = nuclear_repulsion(mole.nuclei)
+nuclear_repulsion(mole::Mole, env::Env) = nuclear_repulsion(mole.nuclei, env.pointcharges)
 
 function overlap_matrix(basis::Basis)
     n = length(basis)
@@ -54,7 +54,7 @@ function nuclear_attraction_matrix(basis::Basis, RC::Vector{Vec3{Float64}}, Z::V
     return M
 end
 
-nuclear_attraction_matrix(mole::Mole) = nuclear_attraction_matrix(mole.basis, mole.atoms.positions, mole.atoms.charges)
+nuclear_attraction_matrix(mole::Mole) = nuclear_attraction_matrix(mole.basis, mole.nuclei.positions, mole.nuclei.charges)
 
 function nuclear_attraction_matrix(basis::Basis, RC::Vector{Vec3{Float64}}, Z::Vector{Float64}, RQ::Vector{Vec3{Float64}}, Q::Vector{Float64})
     n = length(basis)
@@ -71,7 +71,7 @@ function nuclear_attraction_matrix(basis::Basis, RC::Vector{Vec3{Float64}}, Z::V
     return M
 end
 
-nuclear_attraction_matrix(mole::Mole, env::Env) = nuclear_attraction_matrix(mole.basis, mole.atoms.positions, mole.atoms.charges, env.pcharges.positions, env.pcharges.charges)
+nuclear_attraction_matrix(mole::Mole, env::Env) = nuclear_attraction_matrix(mole.basis, mole.nuclei.positions, mole.nuclei.charges, env.pointcharges.positions, env.pointcharges.charges)
 
 function twoe_integral_tensor(basis::Basis)
     n = length(basis)
@@ -154,7 +154,7 @@ function scf(mole::Mole)
     V = nuclear_attraction_matrix(mole)
     int2e = twoe_integral_tensor(mole)
     P0 = zeros(size(S))
-    N = div(sum(mole.atoms.numbers) + mole.charge, 2)
+    N = div(sum(mole.nuclei.numbers) + mole.net_charge, 2)
     Eel, P = scf(S, T, V, int2e, P0, N)
     Enuc = nuclear_repulsion(mole)
     return Eel + Enuc, P
@@ -166,7 +166,7 @@ function scf(mole::Mole, env::Env)
     V = nuclear_attraction_matrix(mole, env)
     int2e = twoe_integral_tensor(mole)
     P0 = zeros(size(S))
-    N = div(sum(mole.atoms.numbers) + mole.charge, 2)
+    N = div(sum(mole.nuclei.numbers) + mole.net_charge, 2)
     Eel, P = scf(S, T, V, int2e, P0, N)
     Enuc = nuclear_repulsion(mole) + nuclear_repulsion(mole, env)
     return Eel + Enuc, P

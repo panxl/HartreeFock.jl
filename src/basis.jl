@@ -4,15 +4,15 @@ end
 
 Basis() = Basis(Vector{CGTO}[])
 
-function Basis(atoms::Atoms, basis_dict::Dict)
+function Basis(nuclei::Nuclei, basis_dict::Dict)
     basis = Basis()
-    for atom in atoms
-        for shell in basis_dict[string(atom.number)]["electron_shells"]
+    for nucleus in nuclei
+        for shell in basis_dict[string(nucleus.number)]["electron_shells"]
             exponents = parse.(Float64, shell["exponents"])
             for angular in shell["angular_momentum"]
                 coefficients = parse.(Float64, shell["coefficients"][angular + 1])
-                for L in ANGULAR[angular + 1]
-                    push!(basis, CGTO(coefficients, exponents, atom.position, collect(L)))
+                for L in ANGULAR_MOMENTUM[angular + 1]
+                    push!(basis, CGTO(coefficients, exponents, nucleus.position, collect(L)))
                 end
             end
         end
@@ -20,10 +20,10 @@ function Basis(atoms::Atoms, basis_dict::Dict)
     return basis
 end
 
-function Basis(atoms::Atoms, basis_str::String)
+function Basis(nuclei::Nuclei, basis_str::String)
     file = joinpath(@__DIR__, "data/basis/$(basis_str).json")
     basis_dict = JSON.parsefile(file)["elements"]
-    return Basis(atoms, basis_dict)
+    return Basis(nuclei, basis_dict)
 end
 
 Base.iterate(basis::Basis, state=1) = state > length(basis) ? nothing : (basis[state], state+1)

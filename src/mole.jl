@@ -1,20 +1,30 @@
 abstract type AbstractMole end
 
 struct Mole <: AbstractMole
-    atoms::Atoms
+    nuclei::Nuclei
     basis::Basis
-    charge::Int
+    net_charge::Int
     multiplicity::Int
 end
 
-function Mole(atoms::Atoms, basis_dict::Dict, charge::Int, multiplicity::Int)
-    basis = Basis(atoms, basis_dict)
-    return Mole(atoms, basis, charge, multiplicity)
+function Mole(
+    nuclei::Nuclei,
+    basis::Union{Dict,String},
+    net_charge::Int,
+    multiplicity::Int,
+    )
+    basis = Basis(nuclei, basis)
+    return Mole(nuclei, basis, net_charge, multiplicity)
 end
 
-function Mole(atoms::Atoms, basis_str::String, charge::Int, multiplicity::Int)
-    basis = Basis(atoms, basis_str)
-    return Mole(atoms, basis, charge, multiplicity)
+function Mole(
+    nuclei::String,
+    basis::Union{Basis,Dict,String},
+    net_charge::Int,
+    multiplicity::Int,
+    )
+    nuclei = Nuclei(nuclei)
+    return Mole(nuclei, basis, net_charge, multiplicity)
 end
 
 function Mole(atoms, basis)
@@ -24,5 +34,5 @@ end
 abstract type AbstractEnv end
 
 struct Env <: AbstractEnv
-    pcharges::PCharges
+    pointcharges::PointCharges
 end
