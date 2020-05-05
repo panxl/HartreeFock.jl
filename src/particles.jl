@@ -125,7 +125,7 @@ struct GaussianCharges <: AbstractParticleGroup
     sigmas::Vector{Float64}
 end
 
-GaussianCharges(g::AbstractParticleGroup, sigmas::Vector{Float64}) = PointCharges(g.positions, g.charges, sigmas)
+GaussianCharges(g::AbstractParticleGroup, sigmas::Vector{Float64}) = GaussianCharges(g.positions, g.charges, sigmas)
 GaussianCharges() = GaussianCharges(Vector{Vec3{Float64}}[], Vector{Float64}[], Vector{Float64}[])
 
 function Base.push!(g::GaussianCharges, p::GaussianCharge)

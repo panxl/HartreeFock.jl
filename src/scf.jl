@@ -142,7 +142,7 @@ function scf(
 
         if abs(Eel - Eold) < conv_tol
             println("SCF converged: Eel = $(Eel)")
-            return Eel, P
+            return Eel, 2 .* P
         end
     end
     println("SCF failed after $(max_cycle) steps")
