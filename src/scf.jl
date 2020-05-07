@@ -42,6 +42,25 @@ end
 
 kinetic_matrix(mole::Mole) = kinetic_matrix(mole.basis)
 
+function rinv_matrix(
+    basis::Basis,
+    RC::Vec3{Float64},
+    )
+    n = length(basis)
+    M = zeros(n, n)
+    for (i,j) in pairs(n)
+        M[i, j] = M[j, i] = rinv(basis[i], basis[j], RC)
+    end
+    return M
+end
+
+function rinv_matrix(
+    basis::Basis,
+    p::AbstractParticle,
+    )
+    return rinv_matrix(basis, p.position)
+end
+
 function nuclear_attraction_matrix(
     basis::Basis,
     RC::Vec3{Float64},
@@ -163,26 +182,28 @@ function scf(
     println("SCF failed after $(max_cycle) steps")
 end
 
-function scf(mole::Mole)
+function scf!(mole::Mole)
     S = overlap_matrix(mole)
     T = kinetic_matrix(mole)
     V = nuclear_attraction_matrix(mole)
     int2e = electron_repulsion_tensor(mole)
-    P0 = zeros(size(S))
+    P0 = mole.density_matrix
     N = div(sum(mole.nuclei.numbers) + mole.net_charge, 2)
     Eel, P = scf(S, T, V, int2e, P0, N)
     Enuc = nuclear_repulsion(mole)
-    return Eel + Enuc, P
+    mole.density_matrix = P
+    return Eel + Enuc
 end
 
-function scf(mole::Mole, env::Env)
+function scf!(mole::Mole, env::Env)
     S = overlap_matrix(mole)
     T = kinetic_matrix(mole)
     V = nuclear_attraction_matrix(mole) + nuclear_attraction_matrix(mole, env)
     int2e = electron_repulsion_tensor(mole)
-    P0 = zeros(size(S))
+    P0 = mole.density_matrix
     N = div(sum(mole.nuclei.numbers) + mole.net_charge, 2)
     Eel, P = scf(S, T, V, int2e, P0, N)
     Enuc = nuclear_repulsion(mole) + nuclear_repulsion(mole, env)
-    return Eel + Enuc, P
+    mole.density_matrix = P
+    return Eel + Enuc
 end

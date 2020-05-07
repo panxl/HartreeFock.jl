@@ -1,10 +1,21 @@
 abstract type AbstractMole end
 
-struct Mole <: AbstractMole
+mutable struct Mole <: AbstractMole
     nuclei::Nuclei
     basis::Basis
     net_charge::Int
     multiplicity::Int
+    density_matrix::Matrix{Float64}
+    function Mole(
+        nuclei::Nuclei,
+        basis::Basis,
+        net_charge::Int,
+        multiplicity::Int,
+        )
+        n = length(basis)
+        density_matrix = zeros(n, n)
+        new(nuclei, basis, net_charge, multiplicity, density_matrix)
+    end
 end
 
 function Mole(
