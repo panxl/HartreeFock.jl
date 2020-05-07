@@ -42,49 +42,64 @@ end
 
 kinetic_matrix(mole::Mole) = kinetic_matrix(mole.basis)
 
-function nuclear_attraction_matrix(basis::Basis, RC::Vector{Vec3{Float64}}, Z::Vector{Float64})
+function nuclear_attraction_matrix(
+    basis::Basis,
+    RC::Vec3{Float64},
+    Z::Float64
+    )
+    n = length(basis)
+    M = zeros(n, n)
+    for (i,j) in pairs(n)
+        M[i, j] = M[j, i] = -Z * rinv(basis[i], basis[j], RC)
+    end
+    return M
+end
+
+function nuclear_attraction_matrix(
+    basis::Basis,
+    p::AbstractParticle,
+    )
+    return nuclear_attraction_matrix(basis, p.position, p.charge)
+end
+
+function nuclear_attraction_matrix(
+    basis::Basis,
+    RC::Vector{Vec3{Float64}},
+    Z::Vector{Float64}
+    )
     n = length(basis)
     M = zeros(n, n)
     for (i,j) in pairs(n)
         for (rc, z) in zip(RC, Z)
-            M[i, j] += nuclear_attraction(basis[i], basis[j], rc, z)
+            M[i, j] += -z * rinv(basis[i], basis[j], rc)
         end
         M[j, i] = M[i, j]
     end
     return M
 end
 
-nuclear_attraction_matrix(mole::Mole) = nuclear_attraction_matrix(mole.basis, mole.nuclei.positions, mole.nuclei.charges)
-
-function nuclear_attraction_matrix(basis::Basis, RC::Vector{Vec3{Float64}}, Z::Vector{Float64}, RQ::Vector{Vec3{Float64}}, Q::Vector{Float64})
-    n = length(basis)
-    M = zeros(n, n)
-    for (i,j) in pairs(n)
-        for (rc, z) in zip(RC, Z)
-            M[i, j] += nuclear_attraction(basis[i], basis[j], rc, z)
-        end
-        for (rq, q) in zip(RQ, Q)
-            M[i, j] += nuclear_attraction(basis[i], basis[j], rq, q)
-        end
-        M[j, i] = M[i, j]
-    end
-    return M
+function nuclear_attraction_matrix(
+    basis::Basis,
+    g::AbstractParticleGroup,
+    )
+    return nuclear_attraction_matrix(basis, g.positions, g.charges)
 end
 
-nuclear_attraction_matrix(mole::Mole, env::Env) = nuclear_attraction_matrix(mole.basis, mole.nuclei.positions, mole.nuclei.charges, env.pointcharges.positions, env.pointcharges.charges)
+nuclear_attraction_matrix(mole::Mole) = nuclear_attraction_matrix(mole.basis, mole.nuclei)
 
-function twoe_integral_tensor(basis::Basis)
+nuclear_attraction_matrix(mole::Mole, env::Env) = nuclear_attraction_matrix(mole.basis, env.pointcharges)
+
+function electron_repulsion_tensor(basis::Basis)
     n = length(basis)
     N = binomial(binomial(n + 1, 2) + 1, 2)
     tensor = zeros(N)
     for (i,j,k,l) in basis_iterator(n)
-#         println("$i,$j,$k,$l,$(basis_index(i,j,k,l))")
         tensor[basis_index(i,j,k,l)] = electron_repulsion(basis[i], basis[j], basis[k], basis[l])
     end
     return tensor
 end
 
-twoe_integral_tensor(mole::Mole) = twoe_integral_tensor(mole.basis)
+electron_repulsion_tensor(mole::Mole) = electron_repulsion_tensor(mole.basis)
 
 function twoe_fock_matrix(P::Matrix{Float64}, T::Vector{Float64})
     n = size(P, 1)
@@ -97,7 +112,7 @@ function twoe_fock_matrix(P::Matrix{Float64}, T::Vector{Float64})
     return G
 end
 
-twoe_fock_matrix(P::Matrix{Float64}, basis::Basis) = twoe_fock_matrix(P, twoe_integral_tensor(basis))
+twoe_fock_matrix(P::Matrix{Float64}, basis::Basis) = twoe_fock_matrix(P, electron_repulsion_tensor(basis))
 twoe_fock_matrix(P::Matrix{Float64}, mole::Mole) = twoe_fock_matrix(P, mole.basis)
 
 function density_matrix(C::Matrix{Float64}, N::Int)
@@ -152,7 +167,7 @@ function scf(mole::Mole)
     S = overlap_matrix(mole)
     T = kinetic_matrix(mole)
     V = nuclear_attraction_matrix(mole)
-    int2e = twoe_integral_tensor(mole)
+    int2e = electron_repulsion_tensor(mole)
     P0 = zeros(size(S))
     N = div(sum(mole.nuclei.numbers) + mole.net_charge, 2)
     Eel, P = scf(S, T, V, int2e, P0, N)
@@ -163,8 +178,8 @@ end
 function scf(mole::Mole, env::Env)
     S = overlap_matrix(mole)
     T = kinetic_matrix(mole)
-    V = nuclear_attraction_matrix(mole, env)
-    int2e = twoe_integral_tensor(mole)
+    V = nuclear_attraction_matrix(mole) + nuclear_attraction_matrix(mole, env)
+    int2e = electron_repulsion_tensor(mole)
     P0 = zeros(size(S))
     N = div(sum(mole.nuclei.numbers) + mole.net_charge, 2)
     Eel, P = scf(S, T, V, int2e, P0, N)
