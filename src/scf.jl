@@ -159,11 +159,13 @@ function scf(
     Hcore = T + V
     P = copy(P0)
     Eel = 0.0
+    e = zeros(n)
+    C = zeros(n, n)
 
     for cycle = 1:max_cycle
         G = twoe_fock_matrix(P, int2e)
         F = Hcore + G
-        E, C = eigen(F, S)
+        e, C = eigen(F, S)
         P = density_matrix(C, N)
 
         Eold = Eel
@@ -176,34 +178,59 @@ function scf(
 
         if abs(Eel - Eold) < conv_tol
             println("SCF converged: Eel = $(Eel)")
-            return Eel, 2 .* P
+            return Eel, 2 .* P, e, C
         end
     end
     println("SCF failed after $(max_cycle) steps")
 end
 
-function scf!(mole::Mole)
+struct SCF
+    mole::Mole
+    S::Matrix{Float64}
+    T::Matrix{Float64}
+    V::Matrix{Float64}
+    int2e::Vector{Float64}
+    P::Matrix{Float64}
+    C::Matrix{Float64}
+    e::Vector{Float64}
+    Eel::Float64
+    Enuc::Float64
+end
+
+function SCF(mole::Mole)
     S = overlap_matrix(mole)
     T = kinetic_matrix(mole)
     V = nuclear_attraction_matrix(mole)
     int2e = electron_repulsion_tensor(mole)
-    P0 = mole.density_matrix
+    P0 = zeros(size(S))
     N = div(sum(mole.nuclei.numbers) + mole.net_charge, 2)
-    Eel, P = scf(S, T, V, int2e, P0, N)
+    Eel, P, e, C = scf(S, T, V, int2e, P0, N)
     Enuc = nuclear_repulsion(mole)
-    mole.density_matrix = P
-    return Eel + Enuc
+    return SCF(mole, S, T, V, int2e, P, C, e, Eel, Enuc)
 end
 
-function scf!(mole::Mole, env::Env)
+function SCF(mole::Mole, env::Env)
     S = overlap_matrix(mole)
     T = kinetic_matrix(mole)
     V = nuclear_attraction_matrix(mole) + nuclear_attraction_matrix(mole, env)
     int2e = electron_repulsion_tensor(mole)
-    P0 = mole.density_matrix
+    P0 = zeros(size(S))
     N = div(sum(mole.nuclei.numbers) + mole.net_charge, 2)
-    Eel, P = scf(S, T, V, int2e, P0, N)
+    Eel, P, e, C = scf(S, T, V, int2e, P0, N)
     Enuc = nuclear_repulsion(mole) + nuclear_repulsion(mole, env)
-    mole.density_matrix = P
-    return Eel + Enuc
+    return SCF(mole, S, T, V, int2e, P, C, e, Eel, Enuc)
+end
+
+function total_energy(scf::SCF)
+    return scf.Eel + scf.Enuc
+end
+
+function total_energy(mole::Mole)
+    scf = SCF(mole)
+    return scf.Eel + scf.Enuc
+end
+
+function total_energy(mole::Mole, env::Env)
+    scf = SCF(mole, env)
+    return scf.Eel + scf.Enuc
 end

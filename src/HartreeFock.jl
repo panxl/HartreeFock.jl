@@ -11,8 +11,8 @@ include("utils.jl")
 include("particles.jl")
 include("basis.jl")
 include("mole.jl")
-include("electrostatics.jl")
 include("integral.jl")
 include("scf.jl")
+include("electrostatics.jl")
 
 end # module

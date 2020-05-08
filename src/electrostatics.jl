@@ -63,16 +63,32 @@ function electrostatic_potential(
 end
 
 function electrostatic_potential(
-    mole::Mole,
+    scf::SCF,
     pb::AbstractParticle,
     )
-    Vnuc = electrostatic_potential(mole.nuclei, pb)
-    Vel = sum(rinv_matrix(mole.basis, pb) .* mole.density_matrix)
+    Vnuc = electrostatic_potential(scf.mole.nuclei, pb)
+    Vel = sum(rinv_matrix(scf.mole.basis, pb) .* scf.P)
     return Vnuc - Vel
 end
 
 function electrostatic_potential(
-    mole::Union{AbstractParticle,AbstractParticleGroup,Mole},
+    mole::Mole,
+    pb::AbstractParticle,
+    )
+    scf = SCF(mole)
+    return electrostatic_potential(scf, pb)
+end
+
+function electrostatic_potential(
+    mole::Tuple{Mole,Env},
+    pb::AbstractParticle,
+    )
+    scf = SCF(mole...)
+    return electrostatic_potential(scf, pb)
+end
+
+function electrostatic_potential(
+    mole::Union{AbstractParticle,AbstractParticleGroup,SCF,Mole,Tuple{Mole,Env}},
     gb::AbstractParticleGroup,
     )
     ret = zeros(length(gb))
