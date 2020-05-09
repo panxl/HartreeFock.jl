@@ -15,3 +15,5 @@ const ANGULAR_MOMENTUM = [
     ]
 
 const CODATA08_BOHR_TO_A = 0.5291772085936
+
+const PI = Float64(π)

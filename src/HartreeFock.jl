@@ -1,9 +1,11 @@
 module HartreeFock
 
+using JSON
 using LinearAlgebra
 using SpecialFunctions
 using StaticArrays
-using JSON
+using Zygote
+using Zygote: @adjoint, dropgrad
 
 include("constants.jl")
 include("parser.jl")

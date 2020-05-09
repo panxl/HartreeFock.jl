@@ -1,4 +1,5 @@
 function E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int, t::Int=0)
+    t = dropgrad(t)
     if t < 0 || t > (i + j)
         # out of bounds for t
         return 0.0
@@ -52,10 +53,10 @@ function overlap(
         RAB::Vec3{Float64},
     )
     p = a + b
-    Sx = E(a, b, RAB.x, LA.x, LB.x, 0)
-    Sy = E(a, b, RAB.y, LA.y, LB.y, 0)
-    Sz = E(a, b, RAB.z, LA.z, LB.z, 0)
-    return (π / p)^(1.5) * Sx * Sy * Sz
+    Sx = E(a, b, RAB[1], LA[1], LB[1], 0)
+    Sy = E(a, b, RAB[2], LA[2], LB[2], 0)
+    Sz = E(a, b, RAB[3], LA[3], LB[3], 0)
+    return (PI / p)^(1.5) * Sx * Sy * Sz
 end
 
 function overlap(
@@ -93,10 +94,10 @@ function kinetic(
         RAB::Vec3{Float64},
     )
     p = a + b
-    Tx = K(a, b, RAB.x, LA.x, LB.x) * E(a, b, RAB.y, LA.y, LB.y) * E(a, b, RAB.z, LA.z, LB.z)
-    Ty = E(a, b, RAB.x, LA.x, LB.x) * K(a, b, RAB.y, LA.y, LB.y) * E(a, b, RAB.z, LA.z, LB.z)
-    Tz = E(a, b, RAB.x, LA.x, LB.x) * E(a, b, RAB.y, LA.y, LB.y) * K(a, b, RAB.z, LA.z, LB.z)
-    return (π / p)^(1.5) * (Tx + Ty + Tz)
+    Tx = K(a, b, RAB[1], LA[1], LB[1]) * E(a, b, RAB[2], LA[2], LB[2]) * E(a, b, RAB[3], LA[3], LB[3])
+    Ty = E(a, b, RAB[1], LA[1], LB[1]) * K(a, b, RAB[2], LA[2], LB[2]) * E(a, b, RAB[3], LA[3], LB[3])
+    Tz = E(a, b, RAB[1], LA[1], LB[1]) * E(a, b, RAB[2], LA[2], LB[2]) * K(a, b, RAB[3], LA[3], LB[3])
+    return (PI / p)^(1.5) * (Tx + Ty + Tz)
 end
 
 function kinetic(
@@ -146,13 +147,13 @@ function rinv(
     )
     p = a + b
     val = 0.0
-    for t = 0:LA.x + LB.x, u = 0:LA.y + LB.y, v = 0:LA.z + LB.z
-        val += E(a, b, RAB.x, LA.x, LB.x, t) *
-               E(a, b, RAB.y, LA.y, LB.y, u) *
-               E(a, b, RAB.z, LA.z, LB.z, v) *
+    for t = 0:LA[1] + LB[1], u = 0:LA[2] + LB[2], v = 0:LA[3] + LB[3]
+        val += E(a, b, RAB[1], LA[1], LB[1], t) *
+               E(a, b, RAB[2], LA[2], LB[2], u) *
+               E(a, b, RAB[3], LA[3], LB[3], v) *
                R(t, u, v, 0, p, RPC)
     end
-    return 2 * π / p * val
+    return 2 * PI / p * val
 end
 
 function rinv(
@@ -187,19 +188,19 @@ function electron_repulsion(
     q = c + d
     ω = p * q / (p + q)
     val = 0.0
-    for t = 0:LA.x + LB.x, u = 0:LA.y + LB.y, v = 0:LA.z + LB.z
-        for τ = 0:LC.x + LD.x, μ = 0:LC.y + LD.y, υ = 0:LC.z + LD.z
-            val += E(a, b, RAB.x, LA.x, LB.x, t) *
-                   E(a, b, RAB.y, LA.y, LB.y, u) *
-                   E(a, b, RAB.z, LA.z, LB.z, v) *
-                   E(c, d, RCD.x, LC.x, LD.x, τ) *
-                   E(c, d, RCD.y, LC.y, LD.y, μ) *
-                   E(c, d, RCD.z, LC.z, LD.z, υ) *
+    for t = 0:LA[1] + LB[1], u = 0:LA[2] + LB[2], v = 0:LA[3] + LB[3]
+        for τ = 0:LC[1] + LD[1], μ = 0:LC[2] + LD[2], υ = 0:LC[3] + LD[3]
+            val += E(a, b, RAB[1], LA[1], LB[1], t) *
+                   E(a, b, RAB[2], LA[2], LB[2], u) *
+                   E(a, b, RAB[3], LA[3], LB[3], v) *
+                   E(c, d, RCD[1], LC[1], LD[1], τ) *
+                   E(c, d, RCD[2], LC[2], LD[2], μ) *
+                   E(c, d, RCD[3], LC[3], LD[3], υ) *
                    R(t+τ, u+μ, v+υ, 0, ω, RPQ) *
                    (-1)^(τ+μ+υ)
         end
     end
-    val *= 2 * π^2.5 / (p * q * sqrt(p + q))
+    val *= 2 * PI^2.5 / (p * q * sqrt(p + q))
     return val
 end
 

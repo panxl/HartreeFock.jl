@@ -12,9 +12,9 @@ function GTO(
     return GTO(ζ, L, norm)
 end
 
-struct CGTO{N}
-    d::SVector{N, Float64}
-    gtos::SVector{N, GTO}
+struct CGTO
+    d::Vector{Float64}
+    gtos::Vector{GTO}
     R::Vec3{Float64}
     norm::Float64
 end
@@ -31,7 +31,7 @@ function CGTO(
         gtos[i] = GTO(ζ[i], L)
     end
     norm = normalizaton(d, gtos)
-    return CGTO{N}(d, gtos, R, norm)
+    return CGTO(d, gtos, R, norm)
 end
 
 Base.iterate(cgto::CGTO, state=1) = state > length(cgto) ? nothing : (cgto[state], state+1)

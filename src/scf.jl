@@ -22,22 +22,22 @@ nuclear_repulsion(mole::Mole, env::Env) = nuclear_repulsion(mole.nuclei, env.poi
 
 function overlap_matrix(basis::Basis)
     n = length(basis)
-    M = zeros(n, n)
+    M = Zygote.Buffer(Matrix{Float64}(undef, n, n))
     for (i,j) in pairs(n)
         M[i, j] = M[j, i] = overlap(basis[i], basis[j])
     end
-    return M
+    return copy(M)
 end
 
 overlap_matrix(mole::Mole) = overlap_matrix(mole.basis)
 
 function kinetic_matrix(basis::Basis)
     n = length(basis)
-    M = zeros(n, n)
+    M = Zygote.Buffer(Matrix{Float64}(undef, n, n))
     for (i,j) in pairs(n)
         M[i, j] = M[j, i] = kinetic(basis[i], basis[j])
     end
-    return M
+    return copy(M)
 end
 
 kinetic_matrix(mole::Mole) = kinetic_matrix(mole.basis)
@@ -47,11 +47,11 @@ function rinv_matrix(
     RC::Vec3{Float64},
     )
     n = length(basis)
-    M = zeros(n, n)
+    M = Zygote.Buffer(Matrix{Float64}(undef, n, n))
     for (i,j) in pairs(n)
         M[i, j] = M[j, i] = rinv(basis[i], basis[j], RC)
     end
-    return M
+    return copy(M)
 end
 
 function rinv_matrix(
@@ -67,11 +67,11 @@ function nuclear_attraction_matrix(
     Z::Float64
     )
     n = length(basis)
-    M = zeros(n, n)
+    M = Zygote.Buffer(Matrix{Float64}(undef, n, n))
     for (i,j) in pairs(n)
         M[i, j] = M[j, i] = -Z * rinv(basis[i], basis[j], RC)
     end
-    return M
+    return copy(M)
 end
 
 function nuclear_attraction_matrix(
@@ -87,14 +87,17 @@ function nuclear_attraction_matrix(
     Z::Vector{Float64}
     )
     n = length(basis)
-    M = zeros(n, n)
+    M = Zygote.Buffer(Matrix{Float64}(undef, n, n))
+    for i in eachindex(M)
+        M[i] = 0.0
+    end
     for (i,j) in pairs(n)
         for (rc, z) in zip(RC, Z)
             M[i, j] += -z * rinv(basis[i], basis[j], rc)
         end
         M[j, i] = M[i, j]
     end
-    return M
+    return copy(M)
 end
 
 function nuclear_attraction_matrix(
@@ -111,24 +114,27 @@ nuclear_attraction_matrix(mole::Mole, env::Env) = nuclear_attraction_matrix(mole
 function electron_repulsion_tensor(basis::Basis)
     n = length(basis)
     N = binomial(binomial(n + 1, 2) + 1, 2)
-    tensor = zeros(N)
+    tensor = Zygote.Buffer(Vector{Float64}(undef, N))
     for (i,j,k,l) in basis_iterator(n)
         tensor[basis_index(i,j,k,l)] = electron_repulsion(basis[i], basis[j], basis[k], basis[l])
     end
-    return tensor
+    return copy(tensor)
 end
 
 electron_repulsion_tensor(mole::Mole) = electron_repulsion_tensor(mole.basis)
 
 function twoe_fock_matrix(P::Matrix{Float64}, T::Vector{Float64})
     n = size(P, 1)
-    G = zeros(n, n)
+    G = Zygote.Buffer(Matrix{Float64}(undef, n, n))
+    for i in eachindex(G)
+        G[i] = 0.0
+    end
     for (i,j) in pairs(n)
         for k=1:n, l=1:n
             G[i,j] = G[j,i] += (2 * T[basis_index(i,j,k,l)] - T[basis_index(i,k,j,l)]) * P[k, l]
         end
     end
-    return G
+    return copy(G)
 end
 
 twoe_fock_matrix(P::Matrix{Float64}, basis::Basis) = twoe_fock_matrix(P, electron_repulsion_tensor(basis))
@@ -136,13 +142,16 @@ twoe_fock_matrix(P::Matrix{Float64}, mole::Mole) = twoe_fock_matrix(P, mole.basi
 
 function density_matrix(C::Matrix{Float64}, N::Int)
     n = size(C, 1)
-    P = zeros(n, n)
+    P = Zygote.Buffer(Matrix{Float64}(undef, n, n))
+    for i in eachindex(P)
+        P[i] = 0.0
+    end
     for i = 1:n, j = 1:n
         for a = 1:N
             P[i,j] += C[i,a] * C[j,a]
         end
     end
-    return P
+    return copy(P)
 end
 
 function scf(
@@ -162,10 +171,25 @@ function scf(
     e = zeros(n)
     C = zeros(n, n)
 
+    λ, U = eigen(Symmetric(S))
+
+    v = Zygote.Buffer(λ)
+    for i in eachindex(v)
+        v[i] = sqrt(1 / λ[i])
+    end
+    v = copy(v)
+
+    Sp = U * Diagonal(v) * U
+
     for cycle = 1:max_cycle
         G = twoe_fock_matrix(P, int2e)
         F = Hcore + G
-        e, C = eigen(F, S)
+        # e, C = eigen(F, S)
+
+        Fp = Symmetric(Sp * F * Sp)
+        e, Cp = eigen(Fp)
+        C = Sp * Cp
+
         P = density_matrix(C, N)
 
         Eold = Eel
@@ -176,9 +200,9 @@ function scf(
 
         println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel)")
 
-        if abs(Eel - Eold) < conv_tol
+        if abs(Eel - Eold) < dropgrad(conv_tol)
             println("SCF converged: Eel = $(Eel)")
-            return Eel, 2 .* P, e, C
+            return Eel, 2 .* copy(P), copy(e), copy(C)
         end
     end
     println("SCF failed after $(max_cycle) steps")
@@ -233,4 +257,14 @@ end
 function total_energy(mole::Mole, env::Env)
     scf = SCF(mole, env)
     return scf.Eel + scf.Enuc
+end
+
+function electron_energy(mole::Mole)
+    scf = SCF(mole)
+    return scf.Eel
+end
+
+function nuclear_repulsion_energy(mole::Mole)
+    scf = SCF(mole)
+    return scf.Enuc
 end
