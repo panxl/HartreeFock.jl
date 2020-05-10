@@ -80,6 +80,15 @@ function electrostatic_potential(
 end
 
 function electrostatic_potential(
+    mole::Mole,
+    P::Matrix{Float64},
+    pb::AbstractParticle,
+    )
+    scf = SCF(mole, P)
+    return electrostatic_potential(scf, pb)
+end
+
+function electrostatic_potential(
     mole::Tuple{Mole,Env},
     pb::AbstractParticle,
     )
