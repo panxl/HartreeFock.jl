@@ -15,7 +15,6 @@ end
 struct CGTO
     d::Vector{Float64}
     gtos::Vector{GTO}
-    R::Vec3{Float64}
     norm::Float64
 end
 
@@ -23,7 +22,6 @@ function CGTO(
     d::AbstractVector{Float64},
     ζ::AbstractVector{Float64},
     L::AbstractVector{Int},
-    R::Vec3{Float64},
 )
     N = length(d)
     gtos = Vector{GTO}(undef, N)
@@ -31,7 +29,7 @@ function CGTO(
         gtos[i] = GTO(ζ[i], L)
     end
     norm = normalizaton(d, gtos)
-    return CGTO(d, gtos, R, norm)
+    return CGTO(d, gtos, norm)
 end
 
 Base.iterate(cgto::CGTO, state=1) = state > length(cgto) ? nothing : (cgto[state], state+1)
@@ -45,12 +43,14 @@ Base.lastindex(cgto::CGTO) = length(cgto)
 
 struct Basis
     cgtos::Vector{CGTO}
+    ids::Vector{Int}
 end
 
-Basis() = Basis(Vector{CGTO}[])
+Basis() = Basis(Vector{CGTO}[], Vector{Int}[])
 
-function Base.push!(basis::Basis, cgto::CGTO)
+function Base.push!(basis::Basis, cgto::CGTO, id::Int)
     push!(basis.cgtos, cgto)
+    push!(basis.ids, id)
 end
 
 Base.iterate(basis::Basis, state=1) = state > length(basis) ? nothing : (basis[state], state+1)
@@ -64,13 +64,13 @@ Base.lastindex(basis::Basis) = length(basis)
 
 function Basis(nuclei::Nuclei, basis_dict::Dict)
     basis = Basis()
-    for nucleus in nuclei
+    for (id, nucleus) in enumerate(nuclei)
         for shell in basis_dict[string(nucleus.number)]["electron_shells"]
             exponents = parse.(Float64, shell["exponents"])
             for angular in shell["angular_momentum"]
                 coefficients = parse.(Float64, shell["coefficients"][angular + 1])
                 for L in ANGULAR_MOMENTUM[angular + 1]
-                    push!(basis, CGTO(coefficients, exponents, collect(L), nucleus.position))
+                    push!(basis, CGTO(coefficients, exponents, collect(L)), id)
                 end
             end
         end

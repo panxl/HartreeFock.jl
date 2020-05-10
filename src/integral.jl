@@ -67,7 +67,7 @@ function overlap(
     return A.norm * B.norm * overlap(A.ζ, A.L, B.ζ, B.L, RAB)
 end
 
-overlap(A::CGTO, B::CGTO) = contract(overlap, A, B)
+overlap(A::CGTO, RA::Vec3{Float64}, B::CGTO, RB::Vec3{Float64}) = contract(overlap, A, RA, B, RB)
 
 function K(a::Float64, b::Float64, Rx::Float64, i::Int64, j::Int64)
     if i == j == 0
@@ -108,7 +108,7 @@ function kinetic(
     return A.norm * B.norm * kinetic(A.ζ, A.L, B.ζ, B.L, RAB)
 end
 
-kinetic(A::CGTO, B::CGTO) = contract(kinetic, A, B)
+kinetic(A::CGTO, RA::Vec3{Float64}, B::CGTO, RB::Vec3{Float64}) = contract(kinetic, A, RA, B, RB)
 
 function R(t::Int, u::Int, v::Int, n::Int, p::Float64, RPC::Vec3{Float64})
     if t == u == v == 0
@@ -169,7 +169,7 @@ function rinv(
     return A.norm * B.norm * rinv(A.ζ, A.L, B.ζ, B.L, RAB, RPC)
 end
 
-rinv(A::CGTO, B::CGTO, RC::Vec3{Float64}) = contract(rinv, A, B, RC)
+rinv(A::CGTO, RA::Vec3{Float64}, B::CGTO, RB::Vec3{Float64}, RC::Vec3{Float64}) = contract(rinv, A, RA, B, RB, RC)
 
 function electron_repulsion(
         a::Float64,
@@ -223,10 +223,21 @@ function electron_repulsion(
         electron_repulsion(A.ζ, A.L, B.ζ, B.L, C.ζ, C.L, D.ζ, D.L, RAB, RCD, RPQ)
 end
 
-electron_repulsion(A::CGTO, B::CGTO, C::CGTO, D::CGTO) = contract(electron_repulsion, A, B, C, D)
+function electron_repulsion(
+    A::CGTO,
+    RA::Vec3{Float64},
+    B::CGTO,
+    RB::Vec3{Float64},
+    C::CGTO,
+    RC::Vec3{Float64},
+    D::CGTO,
+    RD::Vec3{Float64},
+    )
+    contract(electron_repulsion, A, RA, B, RB, C, RC, D, RD)
+end
 
-function contract(f, A::CGTO, B::CGTO)
-    RAB = A.R - B.R
+function contract(f, A::CGTO, RA::Vec3{Float64}, B::CGTO, RB::Vec3{Float64})
+    RAB = RA - RB
     ret = 0.0
     for i = 1:length(A), j = 1:length(B)
         ret += A.d[i] * B.d[j] * f(A[i], B[j], RAB)
@@ -234,19 +245,19 @@ function contract(f, A::CGTO, B::CGTO)
     return A.norm * B.norm * ret
 end
 
-function contract(f, A::CGTO, B::CGTO, RC::Vec3{Float64})
+function contract(f, A::CGTO, RA::Vec3{Float64}, B::CGTO, RB::Vec3{Float64}, RC::Vec3{Float64})
     ret = 0.0
     for i = 1:length(A), j = 1:length(B)
-        ret += A.d[i] * B.d[j] * f(A[i], A.R, B[j], B.R, RC)
+        ret += A.d[i] * B.d[j] * f(A[i], RA, B[j], RB, RC)
     end
     return A.norm * B.norm * ret
 end
 
-function contract(f, A::CGTO, B::CGTO, C::CGTO, D::CGTO)
+function contract(f, A::CGTO, RA::Vec3{Float64}, B::CGTO, RB::Vec3{Float64}, C::CGTO, RC::Vec3{Float64}, D::CGTO, RD::Vec3{Float64})
     ret = 0.0
     for i = 1:length(A), j = 1:length(B), k = 1:length(C), l = 1:length(D)
         ret += A.d[i] * B.d[j] * C.d[k] * D.d[l] * 
-            f(A[i], A.R, B[j], B.R, C[k], C.R, D[l], D.R)
+            f(A[i], RA, B[j], RB, C[k], RC, D[l], RD)
     end
     return A.norm * B.norm * C.norm * D.norm * ret
 end
