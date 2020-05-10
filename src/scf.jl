@@ -200,10 +200,6 @@ function scf(
     )
     n = size(S, 1)
     Hcore = T + V
-    P = P0 / 2
-    Eel = 0.0
-    e = zeros(n)
-    C = zeros(n, n)
 
     λ, U = eigen(Symmetric(S))
     v = Zygote.Buffer(λ)
@@ -213,16 +209,37 @@ function scf(
     v = copy(v)
     Sp = U * Diagonal(v) * U'
 
+    P = P0 / 2
+    G = twoe_fock_matrix(P, int2e)
+    F = Hcore + G
+
+    Eel = 0.0
+    for i=1:n, j=1:n
+        Eel += P[i,j] * (Hcore[i,j] + F[i,j])
+    end
+    println("Cycle 0: Eel = $(Eel)")
+
+    Fp = Symmetric(Sp * F * Sp)
+    e, Cp = eigen(Fp)
+    C = Sp * Cp
+    P = density_matrix(C, N)
+
+    trial_vector = SMatrix{n, n, Float64}[]
+    residual_vector = SMatrix{n, n, Float64}[]
+
     for cycle = 1:max_cycle
         G = twoe_fock_matrix(P, int2e)
         F = Hcore + G
-        # e, C = eigen(F, S)
 
-        Fp = Symmetric(Sp * F * Sp)
-        e, Cp = eigen(Fp)
-        C = Sp * Cp
+        if length(trial_vector) > 6
+            popfirst!(trial_vector)
+        end
+        push!(trial_vector, F)
 
-        P = density_matrix(C, N)
+        if length(residual_vector) > 6
+            popfirst!(residual_vector)
+        end
+        push!(residual_vector, Sp * (F * P * S - S * P * F) * Sp)
 
         Eold = Eel
         Eel = 0.0
@@ -230,12 +247,35 @@ function scf(
             Eel += P[i,j] * (Hcore[i,j] + F[i,j])
         end
 
-        println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel)")
+        drms = norm(residual_vector[end]) / sqrt(length(residual_vector[end]))
+        println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), RMS = $(drms)")
 
         if abs(Eel - Eold) < dropgrad(conv_tol)
             println("SCF converged: Eel = $(Eel)")
             return Eel, 2 .* copy(P), copy(e), copy(C)
         end
+
+        B_dim = length(residual_vector) + 1
+        B = Matrix{Float64}(undef, B_dim, B_dim)
+        B[end, :] .= -1
+        B[:, end] .= -1
+        B[end, end] = 0
+        for i = 1:length(residual_vector), j = i:length(residual_vector)
+            B[i, j] = sum(residual_vector[i] .* residual_vector[j])
+        end
+
+        coeff = -inv(Symmetric(B))[end, begin:end-1]
+
+        # Build DIIS Fock matrix
+        F = zeros(n, n)
+        for i = 1:length(trial_vector)
+            F += coeff[i] * trial_vector[i]
+        end
+
+        Fp = Sp * F * Sp
+        e, Cp = eigen(Symmetric(Fp))
+        C = Sp * Cp
+        P = density_matrix(C, N)
     end
     println("SCF failed after $(max_cycle) steps")
 end
