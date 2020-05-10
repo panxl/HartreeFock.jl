@@ -67,7 +67,7 @@ function electrostatic_potential(
     pb::AbstractParticle,
     )
     Vnuc = electrostatic_potential(scf.mole.nuclei, pb)
-    Vel = sum(rinv_matrix(scf.mole.basis, pb) .* scf.P)
+    Vel = sum(rinv_matrix(scf.mole.basis, scf.mole.nuclei, pb) .* scf.P)
     return Vnuc - Vel
 end
 
