@@ -20,77 +20,102 @@ end
 nuclear_repulsion(mole::Mole) = nuclear_repulsion(mole.nuclei)
 nuclear_repulsion(mole::Mole, env::Env) = nuclear_repulsion(mole.nuclei, env.pointcharges)
 
-function overlap_matrix(basis::Basis)
+function overlap_matrix(basis::Basis, nuclei::Nuclei)
     n = length(basis)
     M = zeros(n, n)
     for (i,j) in pairs(n)
-        M[i, j] = M[j, i] = overlap(basis[i], basis[j])
-    end
+        A = basis.cgtos[i]
+        RA = nuclei.positions[basis.ids[i]]
+        B = basis.cgtos[j]
+        RB = nuclei.positions[basis.ids[j]]
+        M[i, j] = M[j, i] = overlap(A, RA, B, RB)
+        end
     return M
 end
 
-overlap_matrix(mole::Mole) = overlap_matrix(mole.basis)
+overlap_matrix(mole::Mole) = overlap_matrix(mole.basis, mole.nuclei)
 
-function kinetic_matrix(basis::Basis)
+function kinetic_matrix(basis::Basis, nuclei::Nuclei)
     n = length(basis)
     M = zeros(n, n)
     for (i,j) in pairs(n)
-        M[i, j] = M[j, i] = kinetic(basis[i], basis[j])
-    end
+        A = basis.cgtos[i]
+        RA = nuclei.positions[basis.ids[i]]
+        B = basis.cgtos[j]
+        RB = nuclei.positions[basis.ids[j]]
+        M[i, j] = M[j, i] = kinetic(A, RA, B, RB)
+        end
     return M
 end
 
-kinetic_matrix(mole::Mole) = kinetic_matrix(mole.basis)
+kinetic_matrix(mole::Mole) = kinetic_matrix(mole.basis, mole.nuclei)
 
 function rinv_matrix(
     basis::Basis,
+    nuclei::Nuclei,
     RC::Vec3{Float64},
     )
     n = length(basis)
     M = zeros(n, n)
     for (i,j) in pairs(n)
-        M[i, j] = M[j, i] = rinv(basis[i], basis[j], RC)
-    end
+        A = basis.cgtos[i]
+        RA = nuclei.positions[basis.ids[i]]
+        B = basis.cgtos[j]
+        RB = nuclei.positions[basis.ids[j]]
+        M[i, j] = M[j, i] = rinv(A, RA, B, RB, RC)
+        end
     return M
 end
 
 function rinv_matrix(
     basis::Basis,
+    nuclei::Nuclei,
     p::AbstractParticle,
     )
-    return rinv_matrix(basis, p.position)
+    return rinv_matrix(basis, nuclei, p.position)
 end
 
 function nuclear_attraction_matrix(
     basis::Basis,
+    nuclei::Nuclei,
     RC::Vec3{Float64},
     Z::Float64
     )
     n = length(basis)
     M = zeros(n, n)
     for (i,j) in pairs(n)
-        M[i, j] = M[j, i] = -Z * rinv(basis[i], basis[j], RC)
-    end
+        A = basis.cgtos[i]
+        RA = nuclei.positions[basis.ids[i]]
+        B = basis.cgtos[j]
+        RB = nuclei.positions[basis.ids[j]]
+        M[i, j] = M[j, i] = -Z * rinv(A, RA, B, RB, RC)
+        end
     return M
 end
 
 function nuclear_attraction_matrix(
     basis::Basis,
+    nuclei::Nuclei,
     p::AbstractParticle,
     )
-    return nuclear_attraction_matrix(basis, p.position, p.charge)
+    return nuclear_attraction_matrix(basis, nuclei, p.position, p.charge)
 end
 
 function nuclear_attraction_matrix(
     basis::Basis,
+    nuclei::Nuclei,
     RC::Vector{Vec3{Float64}},
     Z::Vector{Float64}
     )
     n = length(basis)
     M = zeros(n, n)
     for (i,j) in pairs(n)
+        A = basis.cgtos[i]
+        RA = nuclei.positions[basis.ids[i]]
+        B = basis.cgtos[j]
+        RB = nuclei.positions[basis.ids[j]]
         for (rc, z) in zip(RC, Z)
-            M[i, j] += -z * rinv(basis[i], basis[j], rc)
+            M[i, j] += -z * rinv(A, RA, B, RB, rc)
         end
         M[j, i] = M[i, j]
     end
@@ -99,26 +124,35 @@ end
 
 function nuclear_attraction_matrix(
     basis::Basis,
+    nuclei::Nuclei,
     g::AbstractParticleGroup,
     )
-    return nuclear_attraction_matrix(basis, g.positions, g.charges)
+    return nuclear_attraction_matrix(basis, nuclei, g.positions, g.charges)
 end
 
-nuclear_attraction_matrix(mole::Mole) = nuclear_attraction_matrix(mole.basis, mole.nuclei)
+nuclear_attraction_matrix(mole::Mole) = nuclear_attraction_matrix(mole.basis, mole.nuclei, mole.nuclei)
 
-nuclear_attraction_matrix(mole::Mole, env::Env) = nuclear_attraction_matrix(mole.basis, env.pointcharges)
+nuclear_attraction_matrix(mole::Mole, env::Env) = nuclear_attraction_matrix(mole.basis, mole.nuclei, env.pointcharges)
 
-function electron_repulsion_tensor(basis::Basis)
+function electron_repulsion_tensor(basis::Basis, nuclei::Nuclei)
     n = length(basis)
     N = binomial(binomial(n + 1, 2) + 1, 2)
     tensor = zeros(N)
     for (i,j,k,l) in basis_iterator(n)
-        tensor[basis_index(i,j,k,l)] = electron_repulsion(basis[i], basis[j], basis[k], basis[l])
+        A = basis.cgtos[i]
+        RA = nuclei.positions[basis.ids[i]]
+        B = basis.cgtos[j]
+        RB = nuclei.positions[basis.ids[j]]
+        C = basis.cgtos[k]
+        RC = nuclei.positions[basis.ids[k]]
+        D = basis.cgtos[l]
+        RD = nuclei.positions[basis.ids[l]]
+        tensor[basis_index(i,j,k,l)] = electron_repulsion(A, RA, B, RB, C, RC, D, RD)
     end
     return tensor
 end
 
-electron_repulsion_tensor(mole::Mole) = electron_repulsion_tensor(mole.basis)
+electron_repulsion_tensor(mole::Mole) = electron_repulsion_tensor(mole.basis, mole.nuclei)
 
 function twoe_fock_matrix(P::Matrix{Float64}, T::Vector{Float64})
     n = size(P, 1)
@@ -131,8 +165,8 @@ function twoe_fock_matrix(P::Matrix{Float64}, T::Vector{Float64})
     return G
 end
 
-twoe_fock_matrix(P::Matrix{Float64}, basis::Basis) = twoe_fock_matrix(P, electron_repulsion_tensor(basis))
-twoe_fock_matrix(P::Matrix{Float64}, mole::Mole) = twoe_fock_matrix(P, mole.basis)
+twoe_fock_matrix(P::Matrix{Float64}, basis::Basis, nuclei::Nuclei) = twoe_fock_matrix(P, electron_repulsion_tensor(basis, nuclei))
+twoe_fock_matrix(P::Matrix{Float64}, mole::Mole) = twoe_fock_matrix(P, mole.basis, mole.nuclei)
 
 function density_matrix(C::Matrix{Float64}, N::Int)
     n = size(C, 1)

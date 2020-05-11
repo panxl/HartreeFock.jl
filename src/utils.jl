@@ -24,11 +24,13 @@ function norm2(R::Vec3{Float64})
     return s
 end
 
+gamma_inc_p(a, x) = gamma_inc(a, x, 0)[1]
+
 function boys(n::Int, x::Float64)
     if x < 1e-7
-        return 1 / (2 * n + 1) - x / (2 * n + 3)
+        return 1 / (2 * n + 1) - x / (2 * n + 3) + x^2 / (2 * n + 5) / 2
     else
-        return 1 / (2 * x^(n + 0.5)) * gamma(n + 0.5) * gamma_inc(n + 0.5, x, 0)[1]
+        return 1 / (2 * x^(n + 0.5)) * gamma(n + 0.5) * gamma_inc_p(n + 0.5, x)
     end
 end
 
