@@ -152,36 +152,71 @@ function scf(
         int2e::Vector{Float64},
         P0::Matrix{Float64},
         N::Int,
-        conv_tol::Float64=1e-9,
+        e_tol::Float64=1e-7,
+        d_tol::Float64=1e-7,
         max_cycle::Int=64,
     )
     n = size(S, 1)
     Hcore = T + V
-    P = copy(P0)
+
+    # Calculate S^(-1/2)
+    λ, U = eigen(Symmetric(S))
+    v = similar(λ)
+    for i in eachindex(v)
+        v[i] = sqrt(1 / λ[i])
+    end
+    Sp = U * Diagonal(v) * U'
+
+    # Guess Fock matrix
+    P = P0 / 2
+    G = twoe_fock_matrix(P, int2e)
+    F = Hcore + G
+
+    # Guess electron energy
     Eel = 0.0
-    e = zeros(n)
-    C = zeros(n, n)
+    for i=1:n, j=1:n
+        Eel += P[i,j] * (Hcore[i,j] + F[i,j])
+    end
+    println("Cycle 0: Eel = $(Eel)")
+
+    diis = DIIS(n)
 
     for cycle = 1:max_cycle
-        G = twoe_fock_matrix(P, int2e)
-        F = Hcore + G
-        e, C = eigen(F, S)
+        # Update density matrix
+        Fp = Sp * F * Sp
+        e, Cp = eigen(Symmetric(Fp))
+        C = Sp * Cp
         P = density_matrix(C, N)
 
+        # Update Fock matrix
+        G = twoe_fock_matrix(P, int2e)
+        F = Hcore + G
+
+        # Calculate electron energy
         Eold = Eel
         Eel = 0.0
         for i=1:n, j=1:n
             Eel += P[i,j] * (Hcore[i,j] + F[i,j])
         end
 
-        println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel)")
+        # Calculate DIIS error
+        residual = Sp * (F * P * S - S * P * F) * Sp
+        diis_err = norm(residual) / sqrt(length(residual))
 
-        if abs(Eel - Eold) < conv_tol
-            println("SCF converged: Eel = $(Eel)")
-            return Eel, 2 .* P, e, C
+        # Test convergence
+        if abs(Eel - Eold) < e_tol && diis_err < d_tol
+            println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err) Converged!")
+            return Eel, 2 .* copy(P), copy(e), copy(C)
+        else
+            println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err)")
         end
+
+        # Build DIIS Fock matrix
+        diis.add_trial(F)
+        diis.add_residual(residual)
+        F = diis.get_F()
     end
-    println("SCF failed after $(max_cycle) steps")
+    println("SCF failed after $(max_cycle) cycles")
 end
 
 struct SCF
