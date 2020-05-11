@@ -211,7 +211,7 @@ function scf(
     for i=1:n, j=1:n
         Eel += P[i,j] * (Hcore[i,j] + F[i,j])
     end
-    println("Cycle 0: Eel = $(Eel)")
+    @info "Cycle 0: Eel = $(Eel)"
 
     diis = DIIS(n)
 
@@ -239,10 +239,10 @@ function scf(
 
         # Test convergence
         if abs(Eel - Eold) < e_tol && diis_err < d_tol
-            println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err) Converged!")
+            @info "Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err) Converged!"
             return Eel, 2 .* copy(P), copy(e), copy(C)
         else
-            println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err)")
+            @info "Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err)"
         end
 
         # Build DIIS Fock matrix
@@ -250,7 +250,7 @@ function scf(
         diis.add_residual(residual)
         F = diis.get_F()
     end
-    println("SCF failed after $(max_cycle) cycles")
+    @error "SCF failed after $(max_cycle) cycles"
 end
 
 struct SCF

@@ -1,4 +1,4 @@
-using HartreeFock: Mole, Env, PointCharges, SCF, total_energy, electrostatic_potential
+using HartreeFock: Mole, Env, PointCharges, SCF, total_energy, electrostatic_potential, mulliken_charges
 using Test
 
 H2 = Mole("
@@ -25,3 +25,6 @@ E = total_energy(scf)
 
 V = electrostatic_potential(scf, pointcharges)
 @test all(isapprox.(V, [-0.73578734E-02, -0.11128084E-01, -0.64441894E-02], atol=1e-7))
+
+Q = mulliken_charges(scf)
+@test all(isapprox.(Q, [-0.369266, 0.184633, 0.184633], atol=1e-6))
