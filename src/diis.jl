@@ -3,9 +3,9 @@ function DIIS(n::Int, depth::Int=10)
     residual_vector = SMatrix{n, n, Float64}[]
 
     L = zeros(depth+1, depth+1)
-    L[begin, :] .= 1
-    L[:, begin] .= 1
-    L[begin, begin] = 0
+    L[1, :] .= 1
+    L[:, 1] .= 1
+    L[1, 1] = 0
 
     function add_trial(trial)
         push!(trial_vector, trial)
@@ -33,7 +33,7 @@ function DIIS(n::Int, depth::Int=10)
     end
 
     function get_coeff()
-        return inv(Symmetric(get_L()))[begin, begin+1:end]
+        return inv(Symmetric(get_L()))[1, 2:end]
     end
 
     function get_F()
