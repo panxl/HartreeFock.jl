@@ -195,12 +195,14 @@ function scf(
         int2e::Vector{Float64},
         P0::Matrix{Float64},
         N::Int,
-        conv_tol::Float64=1e-9,
+        e_tol::Float64=1e-9,
+        d_tol::Float64=1e-9,
         max_cycle::Int=64,
     )
     n = size(S, 1)
     Hcore = T + V
 
+    # Calculate S^(-1/2)
     λ, U = eigen(Symmetric(S))
     v = Zygote.Buffer(λ)
     for i in eachindex(v)
@@ -209,75 +211,60 @@ function scf(
     v = copy(v)
     Sp = U * Diagonal(v) * U'
 
+    # Guess Fock matrix
     P = P0 / 2
     G = twoe_fock_matrix(P, int2e)
     F = Hcore + G
 
+    # Guess electron energy
     Eel = 0.0
     for i=1:n, j=1:n
         Eel += P[i,j] * (Hcore[i,j] + F[i,j])
     end
     println("Cycle 0: Eel = $(Eel)")
 
-    Fp = Symmetric(Sp * F * Sp)
-    e, Cp = eigen(Fp)
-    C = Sp * Cp
-    P = density_matrix(C, N)
-
-    trial_vector = SMatrix{n, n, Float64}[]
-    residual_vector = SMatrix{n, n, Float64}[]
+    diis = DIIS(n)
 
     for cycle = 1:max_cycle
+        # Update density matrix
+        Fp = Symmetric(Sp * F * Sp)
+        e, Cp = eigen(Fp)
+        C = Sp * Cp
+        P = density_matrix(C, N)
+
+        # Update Fock matrix
         G = twoe_fock_matrix(P, int2e)
         F = Hcore + G
 
-        if length(trial_vector) > 6
-            popfirst!(trial_vector)
-        end
-        push!(trial_vector, F)
-
-        if length(residual_vector) > 6
-            popfirst!(residual_vector)
-        end
-        push!(residual_vector, Sp * (F * P * S - S * P * F) * Sp)
-
+        # Calculate electron energy
         Eold = Eel
         Eel = 0.0
         for i=1:n, j=1:n
             Eel += P[i,j] * (Hcore[i,j] + F[i,j])
         end
 
-        drms = norm(residual_vector[end]) / sqrt(length(residual_vector[end]))
-        println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), RMS = $(drms)")
+        # Calculate DIIS error
+        residual = Sp * (F * P * S - S * P * F) * Sp
+        diis_err = norm(residual) / sqrt(length(residual))
 
-        if abs(Eel - Eold) < dropgrad(conv_tol)
-            println("SCF converged: Eel = $(Eel)")
+        # Test convergence
+        if abs(Eel - Eold) < e_tol && diis_err < d_tol
+            println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err) Converged!")
             return Eel, 2 .* copy(P), copy(e), copy(C)
+        else
+            println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err)")
         end
-
-        B_dim = length(residual_vector) + 1
-        B = Matrix{Float64}(undef, B_dim, B_dim)
-        B[end, :] .= -1
-        B[:, end] .= -1
-        B[end, end] = 0
-        for i = 1:length(residual_vector), j = i:length(residual_vector)
-            B[i, j] = sum(residual_vector[i] .* residual_vector[j])
-        end
-
-        coeff = -inv(Symmetric(B))[end, begin:end-1]
 
         # Build DIIS Fock matrix
+        diis.add_trial(F)
+        diis.add_residual(residual)
+        coeff = diis.get_coeff()
         F = zeros(n, n)
-        for i = 1:length(trial_vector)
-            F += coeff[i] * trial_vector[i]
+        for i = 1:length(coeff)
+            F += coeff[i] * diis.trial_vector[i]
         end
-
-        Fp = Sp * F * Sp
-        e, Cp = eigen(Symmetric(Fp))
-        C = Sp * Cp
-        P = density_matrix(C, N)
     end
-    println("SCF failed after $(max_cycle) steps")
+    println("SCF failed after $(max_cycle) cycles")
 end
 
 struct SCF
