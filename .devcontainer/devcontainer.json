@@ -1,0 +1,5 @@
+{
+    "image": "julia:latest",
+    "extensions": ["julialang.language-julia"],
+    "postCreateCommand": "apt-get update && apt-get install -y git"
+}
