@@ -195,8 +195,8 @@ function scf(
         int2e::Vector{Float64},
         P0::Matrix{Float64},
         N::Int,
-        e_tol::Float64=1e-9,
-        d_tol::Float64=1e-9,
+        e_tol::Float64=1e-7,
+        d_tol::Float64=1e-7,
         max_cycle::Int=64,
     )
     n = size(S, 1)
@@ -227,8 +227,8 @@ function scf(
 
     for cycle = 1:max_cycle
         # Update density matrix
-        Fp = Symmetric(Sp * F * Sp)
-        e, Cp = eigen(Fp)
+        Fp = Sp * F * Sp
+        e, Cp = eigen(Symmetric(Fp))
         C = Sp * Cp
         P = density_matrix(C, N)
 
@@ -258,11 +258,7 @@ function scf(
         # Build DIIS Fock matrix
         diis.add_trial(F)
         diis.add_residual(residual)
-        coeff = diis.get_coeff()
-        F = zeros(n, n)
-        for i = 1:length(coeff)
-            F += coeff[i] * diis.trial_vector[i]
-        end
+        F = diis.get_F()
     end
     println("SCF failed after $(max_cycle) cycles")
 end

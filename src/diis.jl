@@ -1,12 +1,10 @@
-using ShiftedArrays
-
-function DIIS(n::Int, depth::Int=7)
+function DIIS(n::Int, depth::Int=10)
     trial_vector = SMatrix{n, n, Float64}[]
     residual_vector = SMatrix{n, n, Float64}[]
 
     L = zeros(depth+1, depth+1)
-    L[begin, :] .= -1
-    L[:, begin] .= -1
+    L[begin, :] .= 1
+    L[:, begin] .= 1
     L[begin, begin] = 0
 
     function add_trial(trial)
@@ -35,9 +33,18 @@ function DIIS(n::Int, depth::Int=7)
     end
 
     function get_coeff()
-        coeff = -inv(Symmetric(get_L()))[begin, begin+1:end]
+        return inv(Symmetric(get_L()))[begin, begin+1:end]
+    end
+
+    function get_F()
+        coeff = get_coeff()
+        F = zeros(n, n)
+        for i = 1:length(coeff)
+            F += coeff[i] * trial_vector[i]
+        end
+        return F
     end
 
     #Declare public:
-    ()->(trial_vector, residual_vector, add_trial, add_residual, get_coeff)
+    ()->(trial_vector, residual_vector, add_trial, add_residual, get_F)
 end

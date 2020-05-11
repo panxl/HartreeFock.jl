@@ -2,6 +2,7 @@ module HartreeFock
 
 using JSON
 using LinearAlgebra
+using ShiftedArrays
 using SpecialFunctions
 using StaticArrays
 using Zygote
