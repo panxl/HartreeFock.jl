@@ -40,7 +40,7 @@ function DIIS(n::Int, depth::Int=10)
         coeff = get_coeff()
         F = zeros(n, n)
         for i = 1:length(coeff)
-            F += coeff[i] * trial_vector[i]
+            F[:, :] += coeff[i] * trial_vector[i]
         end
         return F
     end
