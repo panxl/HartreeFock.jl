@@ -6,7 +6,7 @@ using ShiftedArrays
 using SpecialFunctions
 using StaticArrays
 using Zygote
-using Zygote: @adjoint, dropgrad
+using Zygote: @adjoint, @nograd, dropgrad
 
 include("constants.jl")
 include("parser.jl")
