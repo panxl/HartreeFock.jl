@@ -176,16 +176,13 @@ twoe_fock_matrix(P::Matrix{Float64}, mole::Mole) = twoe_fock_matrix(P, mole.basi
 
 function density_matrix(C::Matrix{Float64}, N::Int)
     n = size(C, 1)
-    P = Zygote.Buffer(Matrix{Float64}(undef, n, n))
-    for i in eachindex(P)
-        P[i] = 0.0
-    end
+    P = zeros(n, n)
     for i = 1:n, j = 1:n
         for a = 1:N
             P[i,j] += C[i,a] * C[j,a]
         end
     end
-    return copy(P)
+    return P
 end
 
 function scf(
@@ -202,14 +199,9 @@ function scf(
     n = size(S, 1)
     Hcore = T + V
 
-    # Calculate S^(-1/2)
+    # # Calculate S^(-1/2)
     λ, U = eigen(Symmetric(S))
-    v = Zygote.Buffer(λ)
-    for i in eachindex(v)
-        v[i] = sqrt(1 / λ[i])
-    end
-    v = copy(v)
-    Sp = U * Diagonal(v) * U'
+    Sp = U * sqrt(inv(Diagonal(λ))) * U'
 
     # Guess Fock matrix
     P = P0 / 2
@@ -217,19 +209,14 @@ function scf(
     F = Hcore + G
 
     # Guess electron energy
-    Eel = 0.0
-    for i=1:n, j=1:n
-        Eel += P[i,j] * (Hcore[i,j] + F[i,j])
-    end
+    Eel = P ⋅ (Hcore + F)
     println("Cycle 0: Eel = $(Eel)")
 
     diis = DIIS(n)
 
     for cycle = 1:max_cycle
         # Update density matrix
-        Fp = Sp * F * Sp
-        e, Cp = eigen(Symmetric(Fp))
-        C = Sp * Cp
+        e, C = eigen(F, S)
         P = density_matrix(C, N)
 
         # Update Fock matrix
@@ -238,10 +225,7 @@ function scf(
 
         # Calculate electron energy
         Eold = Eel
-        Eel = 0.0
-        for i=1:n, j=1:n
-            Eel += P[i,j] * (Hcore[i,j] + F[i,j])
-        end
+        Eel = P ⋅ (Hcore + F)
 
         # Calculate DIIS error
         residual = Sp * (F * P * S - S * P * F) * Sp
@@ -250,7 +234,7 @@ function scf(
         # Test convergence
         if abs(Eel - Eold) < e_tol && diis_err < d_tol
             println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err) Converged!")
-            return Eel, 2 .* copy(P), copy(e), copy(C)
+            return Eel, 2 .* P, e, C
         else
             println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err)")
         end
@@ -288,17 +272,6 @@ function SCF(mole::Mole)
     return SCF(mole, S, T, V, int2e, P, C, e, Eel, Enuc)
 end
 
-function SCF(mole::Mole, P0::Matrix{Float64})
-    S = overlap_matrix(mole)
-    T = kinetic_matrix(mole)
-    V = nuclear_attraction_matrix(mole)
-    int2e = electron_repulsion_tensor(mole)
-    N = div(sum(mole.nuclei.numbers) + mole.net_charge, 2)
-    Eel, P, e, C = scf(S, T, V, int2e, P0, N)
-    Enuc = nuclear_repulsion(mole)
-    return SCF(mole, S, T, V, int2e, P, C, e, Eel, Enuc)
-end
-
 function SCF(mole::Mole, env::Env)
     S = overlap_matrix(mole)
     T = kinetic_matrix(mole)
@@ -321,15 +294,19 @@ function total_energy(mole::Mole)
     return Eel + Enuc
 end
 
-function total_energy(mole::Mole, P::Matrix{Float64})
-    Eel = electron_energy(mole, P)
-    Enuc = nuclear_repulsion_energy(mole)
-    return Eel + Enuc
-end
-
 function total_energy(mole::Mole, env::Env)
     scf = SCF(mole, env)
     return scf.Eel + scf.Enuc
+end
+
+function electron_energy(mole::Mole)
+    S = overlap_matrix(mole)
+    T = kinetic_matrix(mole)
+    V = nuclear_attraction_matrix(mole)
+    int2e = electron_repulsion_tensor(mole)
+    P0 = zeros(size(S))
+    N = div(sum(mole.nuclei.numbers) + mole.net_charge, 2)
+    return electron_energy(S, T, V, int2e, P0, N)
 end
 
 function electron_energy(
@@ -337,51 +314,40 @@ function electron_energy(
     T::Matrix{Float64},
     V::Matrix{Float64},
     int2e::Vector{Float64},
-    P::Matrix{Float64},
+    P0::Matrix{Float64},
     N::Int,
-)
-    n = size(S, 1)
-    Hcore = T + V
-    G = twoe_fock_matrix(P/2, int2e)
-    F = Hcore + G
-
-    λ, U = eigen(Symmetric(S))
-    v = Zygote.Buffer(λ)
-    for i in eachindex(v)
-        v[i] = sqrt(1 / λ[i])
-    end
-    v = copy(v)
-    Sp = U * Diagonal(v) * U'
-
-    Fp = Symmetric(Sp * F * Sp)
-    e, Cp = eigen(Fp)
-    C = Sp * Cp
-
-    P = density_matrix(C, N)
-    G = twoe_fock_matrix(P, int2e)
-    F = Hcore + G
-
-    Eel = 0.0
-    for i=1:n, j=1:n
-        Eel += P[i,j] * (Hcore[i,j] + F[i,j])
-    end
-
+    )
+    Eel, P, e, C = scf(S, T, V, int2e, P0, N)
     return Eel
 end
 
-function electron_energy(mole::Mole, P::Matrix{Float64})
-    S = overlap_matrix(mole)
-    T = kinetic_matrix(mole)
-    V = nuclear_attraction_matrix(mole)
-    int2e = electron_repulsion_tensor(mole)
-    N = div(sum(mole.nuclei.numbers) + mole.net_charge, 2)
-    P = dropgrad(P)
-    return electron_energy(S, T, V, int2e, P, N)
-end
+@adjoint function electron_energy(
+    S::Matrix{Float64},
+    T::Matrix{Float64},
+    V::Matrix{Float64},
+    int2e::Vector{Float64},
+    P0::Matrix{Float64},
+    N::Int,
+    )
+    Eel, P, e, C = scf(S, T, V, int2e, P0, N)
+    return Eel, function (Δ)
+        n = size(S, 1)    
+        W = zeros(n, n)
+        for i = 1:n, j = 1:n
+            for a = 1:N
+                W[i,j] += 2 * e[a] * C[i,a] * C[j,a]
+            end
+        end
 
-function electron_energy(mole::Mole)
-    scf = SCF(mole)
-    return scf.Eel
+        PP = zeros(size(int2e))
+        for i=1:n, j=1:n
+            for k=1:n, l=1:n
+                PP[basis_index(i,j,k,l)] += (P[i,j] * P[k,l]) / 4
+            end
+        end
+
+        return -W*Δ, P*Δ, P*Δ, PP*Δ, nothing, nothing
+    end
 end
 
 function nuclear_repulsion_energy(mole::Mole)
