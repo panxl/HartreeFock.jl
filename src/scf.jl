@@ -165,9 +165,8 @@ function twoe_fock_matrix(P::Matrix{Float64}, T::Vector{Float64})
     end
     for (i,j) in pairs(n)
         for k=1:n, l=1:n
-            G[i,j] += (2 * T[basis_index(i,j,k,l)] - T[basis_index(i,k,j,l)]) * P[k, l]
+            G[i,j] = G[j,i] += (2 * T[basis_index(i,j,k,l)] - T[basis_index(i,k,j,l)]) * P[k, l]
         end
-        G[j,i] = G[i,j]
     end
     return copy(G)
 end
@@ -200,7 +199,7 @@ function scf(
     n = size(S, 1)
     Hcore = T + V
 
-    # # Calculate S^(-1/2)
+    # Calculate S^(-1/2)
     λ, U = eigen(Symmetric(S))
     Sp = U * sqrt(inv(Diagonal(λ))) * U'
 
@@ -211,7 +210,7 @@ function scf(
 
     # Guess electron energy
     Eel = P ⋅ (Hcore + F)
-    println("Cycle 0: Eel = $(Eel)")
+    @info "Cycle 0: Eel = $(Eel)"
 
     diis = DIIS(n)
 
@@ -234,10 +233,10 @@ function scf(
 
         # Test convergence
         if abs(Eel - Eold) < e_tol && diis_err < d_tol
-            println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err) Converged!")
+            @info "Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err) Converged!"
             return Eel, 2 .* P, e, C
         else
-            println("Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err)")
+            @info "Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err)"
         end
 
         # Build DIIS Fock matrix
@@ -245,7 +244,7 @@ function scf(
         diis.add_residual(residual)
         F = diis.get_F()
     end
-    println("SCF failed after $(max_cycle) cycles")
+    @error "SCF failed after $(max_cycle) cycles"
 end
 
 struct SCF

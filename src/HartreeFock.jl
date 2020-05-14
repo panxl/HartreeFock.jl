@@ -18,5 +18,6 @@ include("integral.jl")
 include("diis.jl")
 include("scf.jl")
 include("electrostatics.jl")
+include("population.jl")
 
 end # module
