@@ -229,7 +229,7 @@ function scf(
         # Test convergence
         if abs(Eel - Eold) < e_tol && diis_err < d_tol
             @info "Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err) Converged!"
-            return Eel, 2 .* copy(P), copy(e), copy(C)
+            return Eel, 2 .* P, e, C
         else
             @info "Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err)"
         end
