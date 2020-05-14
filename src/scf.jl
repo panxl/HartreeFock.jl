@@ -165,8 +165,9 @@ function twoe_fock_matrix(P::Matrix{Float64}, T::Vector{Float64})
     end
     for (i,j) in pairs(n)
         for k=1:n, l=1:n
-            G[i,j] = G[j,i] += (2 * T[basis_index(i,j,k,l)] - T[basis_index(i,k,j,l)]) * P[k, l]
+            G[i,j] += (2 * T[basis_index(i,j,k,l)] - T[basis_index(i,k,j,l)]) * P[k, l]
         end
+        G[j,i] = G[i,j]
     end
     return copy(G)
 end
