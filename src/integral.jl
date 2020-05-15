@@ -1,7 +1,6 @@
 function E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int, t::Int=0)
-    t = dropgrad(t)
-    if t < 0 || t > (i + j)
-        # out of bounds for t
+    if i < 0 || j < 0 || t < 0 || t > (i + j)
+        # out of bounds for i, j, or t
         return 0.0
     end
 
@@ -21,6 +20,36 @@ function E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int, t::Int=0)
                (t+1)*E(a,b,Rx,i,j-1,t+1)
     end
 end
+
+@adjoint function E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int, t::Int=0)
+    return E(a, b, Rx, i, j, t), function (Δ)
+        x̄ = a*E(a,b,Rx,i+1,j)     - 
+            0.5*i*E(a,b,Rx,i-1,j) -
+            b*E(a,b,Rx,i,j+1)     +
+            0.5*j*E(a,b,Rx,i,j-1)
+        return nothing, nothing, x̄*Δ, nothing, nothing, nothing
+    end
+end
+
+# ∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int) = gradient(E, a, b, Rx, i, j)[3]
+
+function ∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int)
+    return a*E(a,b,Rx,i+1,j)     - 
+           0.5*i*E(a,b,Rx,i-1,j) -
+           b*E(a,b,Rx,i,j+1)     +
+           0.5*j*E(a,b,Rx,i,j-1)
+end
+
+# ∇∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int) = gradient(∇E, a, b, Rx, i, j)[3]
+
+function ∇∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int)
+    return -i*j*E(a,b,Rx,i-1,j-1,0)   +
+            2*i*b*E(a,b,Rx,i-1,j+1,0) +
+            2*a*j*E(a,b,Rx,i+1,j-1,0) -
+            4*a*b*E(a,b,Rx,i+1,j+1,0)
+end
+
+∇∇∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int) = gradient(∇∇E, a, b, Rx, i, j)[3]
 
 function normalizaton(
     a::Float64,
@@ -53,10 +82,33 @@ function overlap(
         RAB::Vec3{Float64},
     )
     p = a + b
-    Sx = E(a, b, RAB[1], LA[1], LB[1], 0)
-    Sy = E(a, b, RAB[2], LA[2], LB[2], 0)
-    Sz = E(a, b, RAB[3], LA[3], LB[3], 0)
+    Sx = E(a, b, RAB[1], LA[1], LB[1])
+    Sy = E(a, b, RAB[2], LA[2], LB[2])
+    Sz = E(a, b, RAB[3], LA[3], LB[3])
     return (PI / p)^(1.5) * Sx * Sy * Sz
+end
+
+@adjoint function overlap(
+        a::Float64,
+        LA::Vec3{Int},
+        b::Float64,
+        LB::Vec3{Int},
+        RAB::Vec3{Float64},
+    )
+    p = a + b
+    Sx = E(a, b, RAB[1], LA[1], LB[1])
+    Sy = E(a, b, RAB[2], LA[2], LB[2])
+    Sz = E(a, b, RAB[3], LA[3], LB[3])
+    return (PI / p)^(1.5) * Sx * Sy * Sz, function (Δ)
+        ∇Sx = ∇E(a, b, RAB[1], LA[1], LB[1])
+        ∇Sy = ∇E(a, b, RAB[2], LA[2], LB[2])
+        ∇Sz = ∇E(a, b, RAB[3], LA[3], LB[3])
+        gradient = zeros(3)
+        gradient[1] = (PI / p)^(1.5) * ∇Sx * Sy * Sz
+        gradient[2] = (PI / p)^(1.5) * Sx * ∇Sy * Sz
+        gradient[3] = (PI / p)^(1.5) * Sx * Sy * ∇Sz
+        return nothing, nothing, nothing, nothing, gradient*Δ
+    end
 end
 
 function overlap(
@@ -69,23 +121,6 @@ end
 
 overlap(A::CGTO, RA::Vec3{Float64}, B::CGTO, RB::Vec3{Float64}) = contract(overlap, A, RA, B, RB)
 
-function K(a::Float64, b::Float64, Rx::Float64, i::Int64, j::Int64)
-    if i == j == 0
-        return 2*a*b*E(a,b,Rx,1,1,0)
-    end
-
-    if j == 0
-        return -i*b*E(a,b,Rx,i-1,1,0) + 2*a*b*E(a,b,Rx,i+1,1,0)
-    elseif i == 0
-        return -a*j*E(a,b,Rx,1,j-1,0) + 2*a*b*E(a,b,Rx,1,j+1,0)
-    else
-        return 0.5*i*j*E(a,b,Rx,i-1,j-1,0) -
-               i*b*E(a,b,Rx,i-1,j+1,0)     -
-               a*j*E(a,b,Rx,i+1,j-1,0)     +
-               2*a*b*E(a,b,Rx,i+1,j+1,0)
-    end
-end
-
 function kinetic(
         a::Float64,
         LA::Vec3{Int},
@@ -94,10 +129,42 @@ function kinetic(
         RAB::Vec3{Float64},
     )
     p = a + b
-    Tx = K(a, b, RAB[1], LA[1], LB[1]) * E(a, b, RAB[2], LA[2], LB[2]) * E(a, b, RAB[3], LA[3], LB[3])
-    Ty = E(a, b, RAB[1], LA[1], LB[1]) * K(a, b, RAB[2], LA[2], LB[2]) * E(a, b, RAB[3], LA[3], LB[3])
-    Tz = E(a, b, RAB[1], LA[1], LB[1]) * E(a, b, RAB[2], LA[2], LB[2]) * K(a, b, RAB[3], LA[3], LB[3])
-    return (PI / p)^(1.5) * (Tx + Ty + Tz)
+    Sx = E(a, b, RAB[1], LA[1], LB[1])
+    Sy = E(a, b, RAB[2], LA[2], LB[2])
+    Sz = E(a, b, RAB[3], LA[3], LB[3])
+    ∇∇Sx = ∇∇E(a, b, RAB[1], LA[1], LB[1])
+    ∇∇Sy = ∇∇E(a, b, RAB[2], LA[2], LB[2])
+    ∇∇Sz = ∇∇E(a, b, RAB[3], LA[3], LB[3])
+    return -0.5 * (PI / p)^(1.5) * (∇∇Sx * Sy * Sz + Sx * ∇∇Sy * Sz + Sx * Sy * ∇∇Sz)
+end
+
+@adjoint function kinetic(
+    a::Float64,
+    LA::Vec3{Int},
+    b::Float64,
+    LB::Vec3{Int},
+    RAB::Vec3{Float64},
+    )
+    p = a + b
+    Sx = E(a, b, RAB[1], LA[1], LB[1])
+    Sy = E(a, b, RAB[2], LA[2], LB[2])
+    Sz = E(a, b, RAB[3], LA[3], LB[3])
+    ∇∇Sx = ∇∇E(a, b, RAB[1], LA[1], LB[1])
+    ∇∇Sy = ∇∇E(a, b, RAB[2], LA[2], LB[2])
+    ∇∇Sz = ∇∇E(a, b, RAB[3], LA[3], LB[3])
+    return -0.5 * (PI / p)^(1.5) * (∇∇Sx * Sy * Sz + Sx * ∇∇Sy * Sz + Sx * Sy * ∇∇Sz), function (Δ)
+        ∇Sx = ∇E(a, b, RAB[1], LA[1], LB[1])
+        ∇Sy = ∇E(a, b, RAB[2], LA[2], LB[2])
+        ∇Sz = ∇E(a, b, RAB[3], LA[3], LB[3])
+        ∇∇∇Sx = ∇∇∇E(a, b, RAB[1], LA[1], LB[1])
+        ∇∇∇Sy = ∇∇∇E(a, b, RAB[2], LA[2], LB[2])
+        ∇∇∇Sz = ∇∇∇E(a, b, RAB[3], LA[3], LB[3])
+        gradient = zeros(3)
+        gradient[1] = -0.5 * (PI / p)^(1.5) * (∇∇∇Sx * Sy * Sz + ∇Sx * ∇∇Sy * Sz + ∇Sx * Sy * ∇∇Sz)
+        gradient[2] = -0.5 * (PI / p)^(1.5) * (∇∇Sx * ∇Sy * Sz + Sx * ∇∇∇Sy * Sz + Sx * ∇Sy * ∇∇Sz)
+        gradient[3] = -0.5 * (PI / p)^(1.5) * (∇∇Sx * Sy * ∇Sz + Sx * ∇∇Sy * ∇Sz + Sx * Sy * ∇∇∇Sz)
+        return nothing, nothing, nothing, nothing, gradient*Δ
+    end
 end
 
 function kinetic(
