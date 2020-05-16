@@ -130,7 +130,14 @@ function nuclear_attraction_matrix(
     return nuclear_attraction_matrix(basis, nuclei, g.positions, g.charges)
 end
 
-nuclear_attraction_matrix(mole::Mole) = nuclear_attraction_matrix(mole.basis, mole.nuclei, mole.nuclei)
+function nuclear_attraction_matrix(
+    basis::Basis,
+    nuclei::Nuclei,
+    )
+    return nuclear_attraction_matrix(basis, nuclei, nuclei.positions, nuclei.charges)
+end
+
+nuclear_attraction_matrix(mole::Mole) = nuclear_attraction_matrix(mole.basis, mole.nuclei)
 
 nuclear_attraction_matrix(mole::Mole, env::Env) = nuclear_attraction_matrix(mole.basis, mole.nuclei, env.pointcharges)
 
