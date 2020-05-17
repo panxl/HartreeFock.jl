@@ -1,24 +1,40 @@
+"Hermite expansion coefficients for Gaussian product"
 function E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int, t::Int=0)
-    if t < 0 || t > (i + j)
-        # out of bounds for t
+    if i < 0 || j < 0 || t < 0 || t > (i + j)
+        # out of bounds for i, j, or t
         return 0.0
     end
 
     p = a + b
 
-    if i == j == t == 0
+    if i == j == t == 0 # base case
         return exp(-a*b/p*Rx*Rx)
     end
 
-    if j == 0
-        return (0.5/p)*E(a,b,Rx,i-1,j,t-1) -
-               (b/p*Rx)*E(a,b,Rx,i-1,j,t)  +
-               (t+1)*E(a,b,Rx,i-1,j,t+1)
-    else
+    if j == 0 # decrement index i
+        return (0.5/p)*E(a,b,Rx,i-1,0,t-1) -
+               (b/p*Rx)*E(a,b,Rx,i-1,0,t)  +
+               (t+1)*E(a,b,Rx,i-1,0,t+1)
+    else # decrement index j
         return (0.5/p)*E(a,b,Rx,i,j-1,t-1) +
                (a/p*Rx)*E(a,b,Rx,i,j-1,t)  +
                (t+1)*E(a,b,Rx,i,j-1,t+1)
     end
+end
+
+function ∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int, t::Int=0)
+    if Rx == 0.0
+        return 0.0
+    end
+
+    return 2*a*E(a,b,Rx,i+1,j,t) - i*E(a,b,Rx,i-1,j,t)
+end
+
+function ∇∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int, t::Int=0)
+    return -i*j*E(a,b,Rx,i-1,j-1,t)   +
+            2*i*b*E(a,b,Rx,i-1,j+1,t) +
+            2*a*j*E(a,b,Rx,i+1,j-1,t) -
+            4*a*b*E(a,b,Rx,i+1,j+1,t)
 end
 
 function normalizaton(
@@ -68,23 +84,6 @@ end
 
 overlap(A::CGTO, RA::Vec3{Float64}, B::CGTO, RB::Vec3{Float64}) = contract(overlap, A, RA, B, RB)
 
-function K(a::Float64, b::Float64, Rx::Float64, i::Int64, j::Int64)
-    if i == j == 0
-        return 2*a*b*E(a,b,Rx,1,1,0)
-    end
-
-    if j == 0
-        return -i*b*E(a,b,Rx,i-1,1,0) + 2*a*b*E(a,b,Rx,i+1,1,0)
-    elseif i == 0
-        return -a*j*E(a,b,Rx,1,j-1,0) + 2*a*b*E(a,b,Rx,1,j+1,0)
-    else
-        return 0.5*i*j*E(a,b,Rx,i-1,j-1,0) -
-               i*b*E(a,b,Rx,i-1,j+1,0)     -
-               a*j*E(a,b,Rx,i+1,j-1,0)     +
-               2*a*b*E(a,b,Rx,i+1,j+1,0)
-    end
-end
-
 function kinetic(
         a::Float64,
         LA::Vec3{Int},
@@ -93,10 +92,13 @@ function kinetic(
         RAB::Vec3{Float64},
     )
     p = a + b
-    Tx = K(a, b, RAB.x, LA.x, LB.x) * E(a, b, RAB.y, LA.y, LB.y) * E(a, b, RAB.z, LA.z, LB.z)
-    Ty = E(a, b, RAB.x, LA.x, LB.x) * K(a, b, RAB.y, LA.y, LB.y) * E(a, b, RAB.z, LA.z, LB.z)
-    Tz = E(a, b, RAB.x, LA.x, LB.x) * E(a, b, RAB.y, LA.y, LB.y) * K(a, b, RAB.z, LA.z, LB.z)
-    return (π / p)^(1.5) * (Tx + Ty + Tz)
+    Sx = E(a, b, RAB.x, LA.x, LB.x)
+    Sy = E(a, b, RAB.y, LA.y, LB.y)
+    Sz = E(a, b, RAB.z, LA.z, LB.z)
+    ∇∇Sx = ∇∇E(a, b, RAB.x, LA.x, LB.x)
+    ∇∇Sy = ∇∇E(a, b, RAB.y, LA.y, LB.y)
+    ∇∇Sz = ∇∇E(a, b, RAB.z, LA.z, LB.z)
+    return -0.5 * (π / p)^(1.5) *  (∇∇Sx * Sy * Sz + Sx * ∇∇Sy * Sz + Sx * Sy * ∇∇Sz)
 end
 
 function kinetic(
@@ -109,30 +111,31 @@ end
 
 kinetic(A::CGTO, RA::Vec3{Float64}, B::CGTO, RB::Vec3{Float64}) = contract(kinetic, A, RA, B, RB)
 
+"Auxiliary Hermite integrals"
 function R(t::Int, u::Int, v::Int, n::Int, p::Float64, RPC::Vec3{Float64})
-    if t == u == v == 0
-        return (-2 * p)^n * boys(n, p*norm2(RPC))
-    elseif u == v == 0
-        if t > 1
-            return (t-1) * R(t-2, 0, 0, n+1, p, RPC) +
-                   RPC[1] * R(t-1, 0, 0, n+1, p, RPC)
-        else
+    if t == u == v == 0 # base case
+        return (-2 * p)^n * boys(n, p * (RPC[1]*RPC[1] + RPC[2]*RPC[2] + RPC[3]*RPC[3]))
+    elseif u == v == 0 # decrement index t
+        if t == 1
             return RPC[1] * R(0, 0, 0, n+1, p, RPC)
         end
-    elseif v == 0
-        if u > 1
-            return (u-1) * R(t, u-2, 0, n+1, p, RPC) +
-                   RPC[2] * R(t, u-1, 0, n+1, p, RPC)
-        else
+
+        return (t-1) * R(t-2, 0, 0, n+1, p, RPC) +
+               RPC[1] * R(t-1, 0, 0, n+1, p, RPC)
+    elseif v == 0 # decrement index u
+        if u == 1
             return RPC[2] * R(t, 0, 0, n+1, p ,RPC)
         end
-    else
-        if v > 1
-            return (v-1) * R(t, u, v-2, n+1, p, RPC) +
-                   RPC[3] * R(t, u, v-1, n+1, p, RPC)
-        else
+
+        return (u-1) * R(t, u-2, 0, n+1, p, RPC) +
+               RPC[2] * R(t, u-1, 0, n+1, p, RPC)
+    else # decrement index v
+        if v == 1
             return RPC[3] * R(t, u, 0, n+1, p, RPC)
         end
+
+        return (v-1) * R(t, u, v-2, n+1, p, RPC) +
+               RPC[3] * R(t, u, v-1, n+1, p, RPC)
     end
 end
 
