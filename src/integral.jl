@@ -23,30 +23,32 @@ end
 
 @adjoint function E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int, t::Int=0)
     return E(a, b, Rx, i, j, t), function (Δ)
-        x̄ = a*E(a,b,Rx,i+1,j)     - 
-            0.5*i*E(a,b,Rx,i-1,j) -
-            b*E(a,b,Rx,i,j+1)     +
-            0.5*j*E(a,b,Rx,i,j-1)
-        return nothing, nothing, x̄*Δ, nothing, nothing, nothing
+        if Rx == 0.0
+            x̄ = 0.0
+        else
+            x̄ = Δ * (2*a*E(a,b,Rx,i+1,j,t) - i*E(a,b,Rx,i-1,j,t))
+        end
+        return nothing, nothing, x̄, nothing, nothing, nothing
     end
 end
 
-# ∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int) = gradient(E, a, b, Rx, i, j)[3]
+# ∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int, t::Int=0) = gradient(E, a, b, Rx, i, j, t)[3]
 
-function ∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int)
-    return a*E(a,b,Rx,i+1,j)     - 
-           0.5*i*E(a,b,Rx,i-1,j) -
-           b*E(a,b,Rx,i,j+1)     +
-           0.5*j*E(a,b,Rx,i,j-1)
+function ∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int, t::Int=0)
+    if Rx == 0.0
+        return 0.0
+    else
+        return 2*a*E(a,b,Rx,i+1,j,t) - i*E(a,b,Rx,i-1,j,t)
+    end
 end
 
-# ∇∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int) = gradient(∇E, a, b, Rx, i, j)[3]
+# ∇∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int, t::Int=0) = gradient(∇E, a, b, Rx, i, j, t)[3]
 
-function ∇∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int)
-    return -i*j*E(a,b,Rx,i-1,j-1,0)   +
-            2*i*b*E(a,b,Rx,i-1,j+1,0) +
-            2*a*j*E(a,b,Rx,i+1,j-1,0) -
-            4*a*b*E(a,b,Rx,i+1,j+1,0)
+function ∇∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int, t::Int=0)
+    return -i*j*E(a,b,Rx,i-1,j-1,t)   +
+            2*i*b*E(a,b,Rx,i-1,j+1,t) +
+            2*a*j*E(a,b,Rx,i+1,j-1,t) -
+            4*a*b*E(a,b,Rx,i+1,j+1,t)
 end
 
 ∇∇∇E(a::Float64, b::Float64, Rx::Float64, i::Int, j::Int) = gradient(∇∇E, a, b, Rx, i, j)[3]
@@ -95,19 +97,19 @@ end
         LB::Vec3{Int},
         RAB::Vec3{Float64},
     )
-    p = a + b
-    Sx = E(a, b, RAB[1], LA[1], LB[1])
-    Sy = E(a, b, RAB[2], LA[2], LB[2])
-    Sz = E(a, b, RAB[3], LA[3], LB[3])
-    return (PI / p)^(1.5) * Sx * Sy * Sz, function (Δ)
+    return overlap(a, LA, b, LB, RAB), function (Δ)
+        p = a + b
+        Sx = E(a, b, RAB[1], LA[1], LB[1])
+        Sy = E(a, b, RAB[2], LA[2], LB[2])
+        Sz = E(a, b, RAB[3], LA[3], LB[3])
         ∇Sx = ∇E(a, b, RAB[1], LA[1], LB[1])
         ∇Sy = ∇E(a, b, RAB[2], LA[2], LB[2])
         ∇Sz = ∇E(a, b, RAB[3], LA[3], LB[3])
         gradient = zeros(3)
-        gradient[1] = (PI / p)^(1.5) * ∇Sx * Sy * Sz
-        gradient[2] = (PI / p)^(1.5) * Sx * ∇Sy * Sz
-        gradient[3] = (PI / p)^(1.5) * Sx * Sy * ∇Sz
-        return nothing, nothing, nothing, nothing, gradient*Δ
+        gradient[1] = Δ * (PI / p)^(1.5) * ∇Sx * Sy * Sz
+        gradient[2] = Δ * (PI / p)^(1.5) * Sx * ∇Sy * Sz
+        gradient[3] = Δ * (PI / p)^(1.5) * Sx * Sy * ∇Sz
+        return nothing, nothing, nothing, nothing, gradient
     end
 end
 
@@ -145,25 +147,25 @@ end
     LB::Vec3{Int},
     RAB::Vec3{Float64},
     )
-    p = a + b
-    Sx = E(a, b, RAB[1], LA[1], LB[1])
-    Sy = E(a, b, RAB[2], LA[2], LB[2])
-    Sz = E(a, b, RAB[3], LA[3], LB[3])
-    ∇∇Sx = ∇∇E(a, b, RAB[1], LA[1], LB[1])
-    ∇∇Sy = ∇∇E(a, b, RAB[2], LA[2], LB[2])
-    ∇∇Sz = ∇∇E(a, b, RAB[3], LA[3], LB[3])
-    return -0.5 * (PI / p)^(1.5) * (∇∇Sx * Sy * Sz + Sx * ∇∇Sy * Sz + Sx * Sy * ∇∇Sz), function (Δ)
+    return kinetic(a, LA, b, LB, RAB), function (Δ)
+        p = a + b
+        Sx = E(a, b, RAB[1], LA[1], LB[1])
+        Sy = E(a, b, RAB[2], LA[2], LB[2])
+        Sz = E(a, b, RAB[3], LA[3], LB[3])
         ∇Sx = ∇E(a, b, RAB[1], LA[1], LB[1])
         ∇Sy = ∇E(a, b, RAB[2], LA[2], LB[2])
         ∇Sz = ∇E(a, b, RAB[3], LA[3], LB[3])
+        ∇∇Sx = ∇∇E(a, b, RAB[1], LA[1], LB[1])
+        ∇∇Sy = ∇∇E(a, b, RAB[2], LA[2], LB[2])
+        ∇∇Sz = ∇∇E(a, b, RAB[3], LA[3], LB[3])
         ∇∇∇Sx = ∇∇∇E(a, b, RAB[1], LA[1], LB[1])
         ∇∇∇Sy = ∇∇∇E(a, b, RAB[2], LA[2], LB[2])
         ∇∇∇Sz = ∇∇∇E(a, b, RAB[3], LA[3], LB[3])
         gradient = zeros(3)
-        gradient[1] = -0.5 * (PI / p)^(1.5) * (∇∇∇Sx * Sy * Sz + ∇Sx * ∇∇Sy * Sz + ∇Sx * Sy * ∇∇Sz)
-        gradient[2] = -0.5 * (PI / p)^(1.5) * (∇∇Sx * ∇Sy * Sz + Sx * ∇∇∇Sy * Sz + Sx * ∇Sy * ∇∇Sz)
-        gradient[3] = -0.5 * (PI / p)^(1.5) * (∇∇Sx * Sy * ∇Sz + Sx * ∇∇Sy * ∇Sz + Sx * Sy * ∇∇∇Sz)
-        return nothing, nothing, nothing, nothing, gradient*Δ
+        gradient[1] = Δ * -0.5 * (PI/p)^(1.5) * (∇∇∇Sx * Sy * Sz + ∇Sx * ∇∇Sy * Sz + ∇Sx * Sy * ∇∇Sz)
+        gradient[2] = Δ * -0.5 * (PI/p)^(1.5) * (∇∇Sx * ∇Sy * Sz + Sx * ∇∇∇Sy * Sz + Sx * ∇Sy * ∇∇Sz)
+        gradient[3] = Δ * -0.5 * (PI/p)^(1.5) * (∇∇Sx * Sy * ∇Sz + Sx * ∇∇Sy * ∇Sz + Sx * Sy * ∇∇∇Sz)
+        return nothing, nothing, nothing, nothing, gradient
     end
 end
 
