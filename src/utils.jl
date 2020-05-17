@@ -1,12 +1,10 @@
-# struct Vec3{T} <: FieldVector{3, T}
-#     x::T
-#     y::T
-#     z::T
-# end
+struct Vec3{T} <: FieldVector{3, T}
+    x::T
+    y::T
+    z::T
+end
 
-# StaticArrays.similar_type(::Type{<:Vec3}, ::Type{T}, ::Size{(3,)}) where {T} = Vec3{T}
-
-Vec3{T} = Vector{T}
+StaticArrays.similar_type(::Type{<:Vec3}, ::Type{T}, ::Size{(3,)}) where {T} = Vec3{T}
 
 function gaussian_product_center(
         a::Float64,
