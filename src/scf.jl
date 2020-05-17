@@ -109,14 +109,12 @@ function nuclear_attraction_matrix(
     )
     n = length(basis)
     M = Zygote.Buffer(Matrix{Float64}(undef, n, n))
-    for i in eachindex(M)
-        M[i] = 0.0
-    end
     for (i,j) in pairs(n)
         A = basis.cgtos[i]
         RA = nuclei.positions[basis.ids[i]]
         B = basis.cgtos[j]
         RB = nuclei.positions[basis.ids[j]]
+        M[i, j] = 0.0
         for (rc, z) in zip(RC, Z)
             M[i, j] += -z * rinv(A, RA, B, RB, rc)
         end
@@ -167,13 +165,12 @@ electron_repulsion_tensor(mole::Mole) = electron_repulsion_tensor(mole.basis, mo
 function twoe_fock_matrix(P::Matrix{Float64}, T::Vector{Float64})
     n = size(P, 1)
     G = Zygote.Buffer(Matrix{Float64}(undef, n, n))
-    for i in eachindex(G)
-        G[i] = 0.0
-    end
     for (i,j) in pairs(n)
+        G[i, j] = 0.0
         for k=1:n, l=1:n
-            G[i,j] = G[j,i] += (2 * T[basis_index(i,j,k,l)] - T[basis_index(i,k,j,l)]) * P[k, l]
+            G[i,j] += (2 * T[basis_index(i,j,k,l)] - T[basis_index(i,k,j,l)]) * P[k, l]
         end
+        G[j,i] = G[i,j]
     end
     return copy(G)
 end

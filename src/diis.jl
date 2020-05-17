@@ -7,6 +7,8 @@ function DIIS(n::Int, depth::Int=10)
     L[:, 1] .= 1
     L[1, 1] = 0
 
+    F = zeros(n, n)
+
     function add_trial(trial)
         push!(trial_vector, trial)
         if length(trial_vector) > depth
@@ -38,7 +40,7 @@ function DIIS(n::Int, depth::Int=10)
 
     function get_F()
         coeff = get_coeff()
-        F = zeros(n, n)
+        fill!(F, 0.0)
         for i = 1:length(coeff)
             F[:, :] += coeff[i] * trial_vector[i]
         end
