@@ -33,10 +33,3 @@ function boys(n::Int, x::Float64)
         return 1 / (2 * x^(n + 0.5)) * gamma(n + 0.5) * gamma_inc_p(n + 0.5, x)
     end
 end
-
-triangle(i::Int) = div(i*(i+1), 2)
-triangle(i::Int, j::Int) = i<j ? triangle(j-1)+i : triangle(i-1)+j
-pairs(n::Int) = ((i,j) for i = 1:n for j = i:n)
-
-basis_iterator(n::Int) = ((i,j,k,l) for (i,j) in pairs(n) for (k,l) in pairs(n) if triangle(i,j) <= triangle(k,l))
-basis_index(i::Int, j::Int, k::Int, l::Int) = triangle(triangle(i,j), triangle(k,l))

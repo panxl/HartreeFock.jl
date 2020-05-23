@@ -23,7 +23,7 @@ scf = SCF(H2O, env)
 E = total_energy(scf)
 @test E ≈ -74.964115862
 
-V = electrostatic_potential(scf, pointcharges)
+V = electrostatic_potential(scf, pointcharges.positions)
 @test all(isapprox.(V, [-0.73578734E-02, -0.11128084E-01, -0.64441894E-02], atol=1e-7))
 
 Q = mulliken_charges(scf)

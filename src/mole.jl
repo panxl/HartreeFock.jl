@@ -36,3 +36,23 @@ abstract type AbstractEnv end
 struct Env <: AbstractEnv
     pointcharges::PointCharges
 end
+
+function get_basis_idx(nuclei::Nuclei, basis::Basis)
+    idx = Int[]
+    for i = 1:length(nuclei)
+        number = nuclei.numbers[i]
+        shells_idx = findfirst(==(number), basis.numbers)
+        shells = basis.shells[shells_idx]
+        for (j, shell) in enumerate(shells)
+            angular_momentum = shell.angular_momentum
+            for coefficients in shell.coefficients
+                for _ = 1:2*angular_momentum+1
+                    push!(idx, i)
+                end
+            end
+        end
+    end
+    return idx
+end
+
+get_basis_idx(mole::Mole) = get_basis_idx(mole.nuclei, mole.basis)
