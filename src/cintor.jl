@@ -128,7 +128,7 @@ end
 
 function (intor::CIntor)(intor_name::String)
     cint_name = 'c'*intor_name*"_sph"
-    func = Libcint.func_by_name(cint_name)
+    func = getfield(Libcint, Symbol(cint_name))
     atm = reinterpret(Cint, Array(intor.atm))
     natm = Cint(length(intor.atm))
     bas = reinterpret(Cint, Array(intor.bas))
@@ -141,7 +141,8 @@ function (intor::CIntor)(intor_name::String)
 end
 
 function getints2c(
-    func::Ptr{Nothing},
+    # func::Ptr{Nothing},
+    func::Function,
     atm::AbstractVector{Cint},
     natm::Cint,
     bas::AbstractVector{Cint},
@@ -154,14 +155,15 @@ function getints2c(
     shls = Vector{Cint}(undef, 2)
     for i = 1:n, j = i:n
         shls .= (i-1,j-1)
-        Libcint.eval(func, M[Block(i,j)], shls, atm, natm, bas, nbas, env)
+        func(M[Block(i,j)], shls, atm, natm, bas, nbas, env)
     end
     symmetrize!(M)
     return Array(M)
 end
 
 function getints4c(
-    func::Ptr{Nothing},
+    func::Function,
+    # func::Ptr{Nothing},
     atm::AbstractVector{Cint},
     natm::Cint,
     bas::AbstractVector{Cint},
@@ -175,7 +177,7 @@ function getints4c(
     for i = 1:n, j = i:n
         for k = 1:n, l = k:n
             shls .= (i-1,j-1,k-1,l-1)
-            Libcint.eval(func, T[Block(i,j,k,l)], shls, atm, natm, bas, nbas, env)
+            func(T[Block(i,j,k,l)], shls, atm, natm, bas, nbas, env)
         end
     end
     symmetrize!(T)
