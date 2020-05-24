@@ -58,7 +58,7 @@ function scf(
 
     # Guess electron energy
     Eel = P ⋅ (Hcore + F)
-    # @info "Cycle 0: Eel = $(Eel)"
+    @info "Cycle 0: Eel = $(Eel)"
 
     diis = DIIS(n)
 
@@ -81,10 +81,10 @@ function scf(
 
         # Test convergence
         if abs(Eel - Eold) < e_tol && diis_err < d_tol
-            # @info "Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err) Converged!"
+            @info "Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err) Converged!"
             return Eel, 2 .* P, e, C
         else
-            # @info "Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err)"
+            @info "Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err)"
         end
 
         # Build DIIS Fock matrix

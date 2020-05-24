@@ -143,9 +143,9 @@ end
 function getints2c(
     func::Ptr{Nothing},
     atm::AbstractVector{Cint},
-    natm::Integer,
+    natm::Cint,
     bas::AbstractVector{Cint},
-    nbas::Integer,
+    nbas::Cint,
     env::AbstractVector{Cdouble},
     shl::AbstractVector{Int},
     )
