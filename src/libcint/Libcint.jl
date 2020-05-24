@@ -1,12 +1,13 @@
 module Libcint
 
 using Libdl
+using libcint_jll
 
 const lib = Ref{Ptr{Cvoid}}(0)
 
 function __init__()
-    lib[] = Libdl.dlopen(joinpath(@__DIR__, "libcint.so"))
-    nothing
+    lib[] = Libdl.dlopen(libcint)
+    return nothing
 end
 
 function func_by_name(name::String)
