@@ -7,16 +7,14 @@ function DIIS(n::Int, depth::Int=10)
     L[:, 1] .= 1
     L[1, 1] = 0
 
-    F = zeros(n, n)
-
-    function add_trial(trial)
+    function add_trial(trial::Matrix{Float64})
         push!(trial_vector, trial)
         if length(trial_vector) > depth
             popfirst!(trial_vector)
         end
     end
 
-    function add_residual(residual)
+    function add_residual(residual::Matrix{Float64})
         push!(residual_vector, residual)
         if length(residual_vector) > depth
             popfirst!(residual_vector)
@@ -26,7 +24,7 @@ function DIIS(n::Int, depth::Int=10)
             B = @view get_L()[2:end, 2:end]   
         end
         for i = 1:length(residual_vector)
-            B[i, end] = sum(residual_vector[i] .* residual)
+            B[i, end] = residual_vector[i] ⋅ residual
         end
     end
 
@@ -40,11 +38,7 @@ function DIIS(n::Int, depth::Int=10)
 
     function get_F()
         coeff = get_coeff()
-        fill!(F, 0.0)
-        for i = 1:length(coeff)
-            F[:, :] += coeff[i] * trial_vector[i]
-        end
-        return F
+        return Array(sum(coeff .* trial_vector))
     end
 
     #Declare public:

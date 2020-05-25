@@ -1,4 +1,4 @@
-struct Shell{M, N}
+struct Shell{M,N}
     exponents::SVector{N, Float64}
     angular_momentum::Int
     coefficients::SVector{M, SVector{N, Float64}}

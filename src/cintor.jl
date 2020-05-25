@@ -141,7 +141,6 @@ function (intor::CIntor)(intor_name::String)
 end
 
 function getints2c(
-    # func::Ptr{Nothing},
     func::Function,
     atm::AbstractVector{Cint},
     natm::Cint,
@@ -157,13 +156,13 @@ function getints2c(
         shls .= (i-1,j-1)
         func(M[Block(i,j)], shls, atm, natm, bas, nbas, env)
     end
+    M = Array(M)
     symmetrize!(M)
-    return Array(M)
+    return M
 end
 
 function getints4c(
     func::Function,
-    # func::Ptr{Nothing},
     atm::AbstractVector{Cint},
     natm::Cint,
     bas::AbstractVector{Cint},
@@ -180,6 +179,7 @@ function getints4c(
             func(T[Block(i,j,k,l)], shls, atm, natm, bas, nbas, env)
         end
     end
+    T = Array(T)
     symmetrize!(T)
     return T
 end
