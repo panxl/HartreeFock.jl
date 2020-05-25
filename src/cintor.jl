@@ -149,14 +149,19 @@ function getints2c(
     env::AbstractVector{Cdouble},
     shl::AbstractVector{Int},
     )
-    M = BlockArray{Cdouble}(undef, shl, shl)
-    n = length(shl)
+    n = sum(shl)
+    M = Array{Cdouble}(undef, n, n)
+    MB = PseudoBlockArray(M, shl, shl)
+    buf = Matrix{Cdouble}(undef, 64, 64)
     shls = Vector{Cint}(undef, 2)
-    for i = 1:n, j = i:n
+    for i = 1:nbas, j = i:nbas
         shls .= (i-1,j-1)
-        func(M[Block(i,j)], shls, atm, natm, bas, nbas, env)
+        func(buf, shls, atm, natm, bas, nbas, env)
+        mb = view(MB, Block(i,j))
+        for (idx, I) in enumerate(eachindex(mb))
+            mb[I] = buf[idx]
+        end
     end
-    M = Array(M)
     symmetrize!(M)
     return M
 end
@@ -170,16 +175,22 @@ function getints4c(
     env::AbstractVector{Cdouble},
     shl::AbstractVector{Int},
     )
-    T = BlockArray{Cdouble}(undef, shl, shl, shl, shl)
+    n = sum(shl)
+    T = Array{Cdouble}(undef, n, n, n, n)
+    TB = PseudoBlockArray(T, shl, shl, shl, shl)
+    buf = Matrix{Cdouble}(undef, 64, 64)
     n = length(shl)
     shls = Vector{Cint}(undef, 4)
-    for i = 1:n, j = i:n
-        for k = 1:n, l = k:n
+    for i = 1:nbas, j = i:nbas
+        for k = 1:nbas, l = k:nbas
             shls .= (i-1,j-1,k-1,l-1)
-            func(T[Block(i,j,k,l)], shls, atm, natm, bas, nbas, env)
+            func(buf, shls, atm, natm, bas, nbas, env)
+            tb = view(TB, Block(i,j,k,l))
+            for (idx, I) in enumerate(eachindex(tb))
+                tb[I] = buf[idx]
+            end
         end
     end
-    T = Array(T)
     symmetrize!(T)
     return T
 end
