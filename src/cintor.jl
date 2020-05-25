@@ -182,7 +182,7 @@ function getints4c(
     n = length(shl)
     shls = Vector{Cint}(undef, 4)
     for i = 1:nbas, j = i:nbas
-        for k = 1:nbas, l = k:nbas
+        for k = i:nbas, l = k:nbas
             shls .= (i-1,j-1,k-1,l-1)
             func(buf, shls, atm, natm, bas, nbas, env)
             tb = view(TB, Block(i,j,k,l))
@@ -204,10 +204,14 @@ end
 
 function symmetrize!(T::AbstractArray{Float64,4})
     n = LinearAlgebra.checksquare(T)
-    for i = 1:n, j = i:n, k = 1:n, l = k:n
+    for i = 1:n, j = i:n, k = i:n, l = k:n
         T[i, j, l, k] = T[i, j, k, l]
         T[j, i, k, l] = T[i, j, k, l]
         T[j, i, l, k] = T[i, j, k, l]
+        T[k, l, i, j] = T[i, j, k, l]
+        T[k, l, j, i] = T[i, j, k, l]
+        T[l, k, i, j] = T[i, j, k, l]
+        T[l, k, j, i] = T[i, j, k, l]
     end
 end
 

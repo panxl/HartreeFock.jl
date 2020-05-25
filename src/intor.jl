@@ -297,7 +297,7 @@ function getints4c(
     n = length(cgtos)
     T = zeros(n, n, n, n)
     for i = 1:n, j = i:n
-        for k = 1:n, l = k:n
+        for k = i:n, l = k:n
             A = cgtos[i]
             RA = nuclei.positions[idx[i]]
             B = cgtos[j]
