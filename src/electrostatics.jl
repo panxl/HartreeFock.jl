@@ -117,7 +117,7 @@ function electrostatic_potential(
     )
     Vnuc = electrostatic_potential(scf.mole.nuclei, point)
     intor = Intor(scf.mole)
-    Vel = intor("int1e_rinv", point) ⋅ scf.P
+    Vel = intor("int1e_rinv", point) ⋅ scf.P * 2
     return Vnuc - Vel
 end
 

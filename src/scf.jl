@@ -47,12 +47,8 @@ function scf(
     n = size(S, 1)
     Hcore = T + V
 
-    # Calculate S^(-1/2)
-    λ, U = eigen(Symmetric(S))
-    Sp = U * sqrt(inv(Diagonal(λ))) * U'
-
     # Guess Fock matrix
-    P = P0 / 2
+    P = copy(P0)
     G = two_electron_fock_matrix(P, int2e)
     F = Hcore + G
 
@@ -76,13 +72,14 @@ function scf(
         Eel = P ⋅ (Hcore + F)
 
         # Calculate DIIS error
-        residual = Sp * (F * P * S - S * P * F) * Sp
+        SPF = S * P * F
+        residual = SPF' - SPF
         diis_err = norm(residual) / sqrt(length(residual))
 
         # Test convergence
         if abs(Eel - Eold) < e_tol && diis_err < d_tol
             @info "Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err) Converged!"
-            return Eel, 2 .* P, e, C
+            return Eel, P, e, C
         else
             @info "Cycle $(cycle): Eel = $(Eel), EDelta = $(Eold - Eel), DIIS Error = $(diis_err)"
         end

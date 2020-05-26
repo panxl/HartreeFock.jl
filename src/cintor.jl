@@ -179,15 +179,14 @@ function getints4c(
     T = Array{Cdouble}(undef, n, n, n, n)
     TB = PseudoBlockArray(T, shl, shl, shl, shl)
     buf = Matrix{Cdouble}(undef, 64, 64)
-    n = length(shl)
     shls = Vector{Cint}(undef, 4)
     for i = 1:nbas, j = i:nbas
         for k = i:nbas, l = k:nbas
             shls .= (i-1,j-1,k-1,l-1)
             func(buf, shls, atm, natm, bas, nbas, env)
-            tb = view(TB, Block(i,j,k,l))
-            for (idx, I) in enumerate(eachindex(tb))
-                tb[I] = buf[idx]
+            tb = TB[Block(i,j,k,l)]
+            for idx=1:length(tb)
+                @inbounds tb[idx] = buf[idx]
             end
         end
     end
