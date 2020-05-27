@@ -3,7 +3,6 @@ module HartreeFock
 using BlockArrays
 using JSON
 using LinearAlgebra
-using ShiftedArrays
 using SpecialFunctions
 using StaticArrays
 

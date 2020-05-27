@@ -1,46 +1,43 @@
-function DIIS(n::Int, depth::Int=10)
-    trial_vector = SMatrix{n, n, Float64}[]
-    residual_vector = SMatrix{n, n, Float64}[]
+struct DIIS
+    trial_vector::Array{Float64,3}
+    residual_vector::Array{Float64,3}
+    L::Matrix{Float64}
+    depth::Int
+    cycle::MVector{1,Int}
+    function DIIS(n::Integer, depth::Integer=10)
+        trial_vector = zeros(n, n, depth)
+        residual_vector =  zeros(n, n, depth)
+        L = zeros(depth+1, depth+1)
+        L[1, 2:end] .= 1
+        L[2:end, 1] .= 1
+        new(trial_vector, residual_vector, L, depth, [0])
+    end
+end
 
-    L = zeros(depth+1, depth+1)
-    L[1, :] .= 1
-    L[:, 1] .= 1
-    L[1, 1] = 0
+function update!(
+    diis::DIIS,
+    trial::AbstractMatrix{Float64},
+    residual::AbstractMatrix{Float64},
+    )
+    ptr = mod(diis.cycle[], diis.depth) + 1
+    diis.trial_vector[:, :, ptr] = trial
+    diis.residual_vector[:, :, ptr] = residual
 
-    function add_trial(trial::Matrix{Float64})
-        push!(trial_vector, trial)
-        if length(trial_vector) > depth
-            popfirst!(trial_vector)
+    n = diis.cycle[] < diis.depth ? ptr : diis.depth
+    for i = 1:n
+        diis.L[i+1, ptr+1] = diis.residual_vector[:, :, i] ⋅ residual
+        diis.L[ptr+1, i+1] = diis.L[i+1, ptr+1]
+    end
+
+    coeff = inv(diis.L[1:n+1, 1:n+1])[2:n+1, 1]
+
+    m = LinearAlgebra.checksquare(trial)
+    for i = 1:m, j = i:m
+        trial[i, j] = 0.0
+        for k = 1:n
+            trial[i, j] += coeff[k] * diis.trial_vector[i, j, k]
         end
+        trial[j, i] = trial[i, j]
     end
-
-    function add_residual(residual::Matrix{Float64})
-        push!(residual_vector, residual)
-        if length(residual_vector) > depth
-            popfirst!(residual_vector)
-            B = @view get_L()[2:end, 2:end]
-            B = ShiftedArrays.circshift(B, (-1, -1))
-        else
-            B = @view get_L()[2:end, 2:end]   
-        end
-        for i = 1:length(residual_vector)
-            B[i, end] = residual_vector[i] ⋅ residual
-        end
-    end
-
-    function get_L()
-        return @view L[1:length(residual_vector)+1, 1:length(residual_vector)+1]
-    end
-
-    function get_coeff()
-        return inv(Symmetric(get_L()))[1, 2:end]
-    end
-
-    function get_F()
-        coeff = get_coeff()
-        return Array(sum(coeff .* trial_vector))
-    end
-
-    #Declare public:
-    ()->(trial_vector, residual_vector, add_trial, add_residual, get_F)
+    diis.cycle[] += 1
 end

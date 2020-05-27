@@ -35,7 +35,7 @@ const NUC_ECP = 4  # atoms with pseudo potential
 
 abstract type AbstractIntor end
 
-struct CIntor{N, M} <: AbstractIntor
+struct CIntor{N,M} <: AbstractIntor
     atm::SVector{N, SVector{ATM_SLOTS, Cint}}
     bas::SVector{M, SVector{BAS_SLOTS, Cint}}
     env::Vector{Cdouble}
@@ -49,7 +49,7 @@ function CIntor(nuclei::Nuclei, basis::Basis)
     shl = shell_size(nuclei, basis)
     N = length(atm)
     M = length(bas)
-    return CIntor{N, M}(atm, bas, env, shl)
+    return CIntor{N,M}(atm, bas, env, shl)
 end
 
 CIntor(mole::Mole) = CIntor(mole.nuclei, mole.basis)
@@ -137,6 +137,8 @@ function (intor::CIntor)(intor_name::String)
         return getints2c(func, atm, natm, bas, nbas, intor.env, intor.shl)
     elseif startswith(cint_name, "cint2e")
         return getints4c(func, atm, natm, bas, nbas, intor.env, intor.shl)
+    else
+        error("Integral name not found")
     end
 end
 
@@ -157,9 +159,9 @@ function getints2c(
     for i = 1:nbas, j = i:nbas
         shls .= (i-1,j-1)
         func(buf, shls, atm, natm, bas, nbas, env)
-        mb = view(MB, Block(i,j))
-        for (idx, I) in enumerate(eachindex(mb))
-            mb[I] = buf[idx]
+        mb = MB[Block(i,j)]
+        for idx=1:length(mb)
+            @inbounds mb[idx] = buf[idx]
         end
     end
     symmetrize!(M)

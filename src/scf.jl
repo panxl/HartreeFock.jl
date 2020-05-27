@@ -60,12 +60,12 @@ function scf(
 
     for cycle = 1:max_cycle
         # Update density matrix
-        e, C = eigen(F, S)
+        e::Vector{Float64}, C::Matrix{Float64} = eigen(F, S)
         density_matrix!(P, C, N)
 
         # Update Fock matrix
         two_electron_fock_matrix!(G, P, int2e)
-        F = Hcore + G
+        F .= Hcore .+ G
 
         # Calculate electron energy
         Eold = Eel
@@ -85,9 +85,8 @@ function scf(
         end
 
         # Build DIIS Fock matrix
-        diis.add_trial(F)
-        diis.add_residual(residual)
-        F = diis.get_F()
+        update!(diis, F, residual)
+
     end
     @error "SCF failed after $(max_cycle) cycles"
 end
